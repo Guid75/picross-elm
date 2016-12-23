@@ -1,0 +1,48 @@
+On rajoutera la moitié de l'épaisseur au x
+
+0ième ligne => 0
+1ère ligne  => 1 * grosse epaisseur + largeur cellule
+2ième ligne => 1 * grosse epaisseur + 1 * (épaisseur + largeur cellule)
+3ième ligne  => 1 * grosse epaisseur + 2 * (épaisseur + largeur cellule)
+4ième ligne  => 1 * grosse epaisseur + 3 * (épaisseur + largeur cellule)
+5ième ligne  => 1 * grosse epaisseur + 4 * (épaisseur + largeur cellule)
+
+6ième ligne => 6 * (largeur cellule) + 4 * épaisseur + 2 * grosse épaisseur
+
+
+0 => 0
+1 => 1
+2 => 1
+3 => 1
+4 => 1
+5 => 1
+6 => 2
+7 => 2
+8 => 2
+9 => 2
+10 => 2
+11 => 3
+12 => 3
+13 => 3
+14 => 3
+
+(N - 1) // 5 + 1
+
+
+0 => 1
+1 => 1
+2 => 1
+3 => 1
+4 => 1
+5 => 2
+
+N // 5 + 1
+
+
+dec = N // 6 + 1
+Nième ligne = N * (largeur cellule) + (N - dec) * épaisseur + dec * (grosse épaisseur)
+
+
+
+
+|1|2|3|4|5|6|

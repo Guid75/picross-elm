@@ -4,3 +4,4 @@ elm-stuff/
 repl-temp-*
 dist
 node_modules
+*~

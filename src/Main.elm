@@ -9,6 +9,7 @@ import Svg.Events exposing (onClick, onMouseMove)
 import Matrix exposing (Matrix)
 import Array
 import Mouse
+import Grid exposing (Grid)
 
 
 main : Program Never Model Msg
@@ -34,10 +35,8 @@ type Msg
 
 type alias Model =
     { board : Matrix Cell
-    , cellSize : Float
+    , grid : Grid
     , clickCount : Int
-    , boldThickness : Float
-    , thinThickness : Float
     }
 
 
@@ -75,7 +74,7 @@ colorByCellType : CellType -> String
 colorByCellType cellType =
     case cellType of
         Full ->
-            "black"
+            "#383838" -- "black"
 
         Empty ->
             "darkgray"
@@ -85,10 +84,16 @@ init : ( Model, Cmd Msg )
 init =
     { board =
         Matrix.repeat 17 20 (Cell Full)
-    , cellSize = 20.0
     , clickCount = 0
-    , boldThickness = 2.0
-    , thinThickness = 1.0
+    , grid =
+        { colCount = 17
+        , rowCount = 20
+        , boldInterval = 5
+        , boldThickness = 3.0
+        , thinThickness = 1.0
+        , strokeColor = gridColor
+        , cellSize = 20.0
+        }
     }
         ! []
 
@@ -96,29 +101,26 @@ init =
 drawCell : Model -> Coord -> Cell -> Svg Msg
 drawCell model { col, row } cell =
     let
-        cellX =
-            getNthLineOffset model.cellSize model.thinThickness model.boldThickness col
-
-        cellY =
-            getNthLineOffset model.cellSize model.thinThickness model.boldThickness row
+        { cellX, cellY } =
+            Grid.getCellCoord col row model.grid
 
         colThickness =
             if col % 5 == 0 then
-                model.boldThickness
+                model.grid.boldThickness
             else
-                model.thinThickness
+                model.grid.thinThickness
 
         rowThickness =
             if row % 5 == 0 then
-                model.boldThickness
+                model.grid.boldThickness
             else
-                model.thinThickness
+                model.grid.thinThickness
     in
         rect
             [ x <| toString <| cellX + colThickness / 2.0 + 1.0
             , y <| toString <| cellY + rowThickness / 2.0 + 1.0
-            , width <| toString <| model.cellSize - 2.0
-            , height <| toString <| model.cellSize - 2.0
+            , width <| toString <| model.grid.cellSize - 2.0
+            , height <| toString <| model.grid.cellSize - 2.0
             , fill <| colorByCellType cell.cellType
               -- , strokeWidth "0.5"
               -- , strokeDasharray dashArray
@@ -137,128 +139,6 @@ drawCells model =
         |> Array.toList
 
 
-drawVerticalLine : Model -> Float -> Int -> List (Svg Msg) -> List (Svg Msg)
-drawVerticalLine model gridHeight colIndex lines =
-    let
-        x =
-            getNthLineOffset model.cellSize model.thinThickness model.boldThickness colIndex
-
-        thickness =
-            if colIndex % 5 == 0 then
-                model.boldThickness
-            else
-                model.thinThickness
-    in
-        (line
-            [ x1 <| toString x
-            , y1 "0.0"
-            , x2 <| toString x
-            , y2 <| toString <| gridHeight
-            , stroke gridColor
-            , strokeWidth <| toString thickness
-            ]
-            []
-        )
-            :: lines
-
-
-drawHorizontalLine : Model -> Float -> Int -> List (Svg Msg) -> List (Svg Msg)
-drawHorizontalLine model gridWidth rowIndex lines =
-    let
-        y =
-            getNthLineOffset model.cellSize model.thinThickness model.boldThickness rowIndex
-
-        thickness =
-            if rowIndex % 5 == 0 then
-                model.boldThickness
-            else
-                model.thinThickness
-    in
-        (line
-            [ x1 <| "0.0"
-            , y1 <| toString y
-            , x2 <| toString <| gridWidth
-            , y2 <| toString y
-            , stroke gridColor
-            , strokeWidth <| toString thickness
-            ]
-            []
-        )
-            :: lines
-
-
-getNthLineOffset : Float -> Float -> Float -> Int -> Float
-getNthLineOffset cellSize thinThickness boldThickness lineNumber =
-    let
-        dec =
-            if lineNumber == 0 then
-                0
-            else
-                (lineNumber - 1) // 5 + 1
-
-        thickness =
-            if lineNumber % 5 == 0 then
-                boldThickness
-            else
-                thinThickness
-    in
-        toFloat lineNumber * cellSize + toFloat (lineNumber - dec) * thinThickness + toFloat dec * boldThickness + thickness / 2.0
-
-
-getGridWidth : Model -> Float
-getGridWidth model =
-    let
-        lastLineIndex =
-            Matrix.width model.board
-
-        offset =
-            getNthLineOffset model.cellSize model.thinThickness model.boldThickness lastLineIndex
-
-        thickness =
-            if lastLineIndex % 5 == 0 then
-                model.boldThickness
-            else
-                model.thinThickness
-    in
-        offset + thickness / 2.0
-
-
-getGridHeight : Model -> Float
-getGridHeight model =
-    let
-        lastLineIndex =
-            Matrix.height model.board
-
-        offset =
-            getNthLineOffset model.cellSize model.thinThickness model.boldThickness lastLineIndex
-
-        thickness =
-            if lastLineIndex % 5 == 0 then
-                model.boldThickness
-            else
-                model.thinThickness
-    in
-        offset + thickness / 2.0
-
-
-drawEmptyGrid : Model -> Svg Msg
-drawEmptyGrid model =
-    let
-        gridWidth =
-            getGridWidth model
-
-        gridHeight =
-            getGridHeight model
-    in
-        g
-            []
-            (List.concat
-                [ (List.foldl (drawVerticalLine model gridHeight) [] (List.range 0 (Matrix.width model.board)))
-                , (List.foldl (drawHorizontalLine model gridWidth) [] (List.range 0 (Matrix.height model.board)))
-                ]
-            )
-
-
 viewSvg : Model -> Html Msg
 viewSvg model =
     svg
@@ -271,7 +151,7 @@ viewSvg model =
         ]
     <|
         List.append
-            [ drawEmptyGrid model ]
+            [ g [] <| Grid.drawGrid model.grid ]
             (drawCells model)
 
 
@@ -287,11 +167,11 @@ view model =
                 [ Html.Attributes.type_ "range"
                 , Html.Attributes.min "1"
                 , Html.Attributes.max "10"
-                , Html.Attributes.value <| toString model.boldThickness
+                , Html.Attributes.value <| toString model.grid.boldThickness
                 , Html.Events.onInput BoldThicknessChanged
                 ]
                 []
-            , Html.text <| toString model.boldThickness
+            , Html.text <| toString model.grid.boldThickness
             ]
         , div
             []
@@ -300,11 +180,11 @@ view model =
                 [ Html.Attributes.type_ "range"
                 , Html.Attributes.min "1"
                 , Html.Attributes.max "10"
-                , Html.Attributes.value <| toString model.thinThickness
+                , Html.Attributes.value <| toString model.grid.thinThickness
                 , Html.Events.onInput ThinThicknessChanged
                 ]
                 []
-            , Html.text <| toString model.thinThickness
+            , Html.text <| toString model.grid.thinThickness
             ]
         , div
             []
@@ -313,11 +193,11 @@ view model =
                 [ Html.Attributes.type_ "range"
                 , Html.Attributes.min "1"
                 , Html.Attributes.max "40"
-                , Html.Attributes.value <| toString model.cellSize
+                , Html.Attributes.value <| toString model.grid.cellSize
                 , Html.Events.onInput CellSizeChanged
                 ]
                 []
-            , Html.text <| toString model.cellSize
+            , Html.text <| toString model.grid.cellSize
             ]
         ]
 
@@ -352,13 +232,34 @@ update msg model =
             ( model, requestBoardMousePos ( pos.x, pos.y ) )
 
         BoldThicknessChanged value ->
-            { model | boldThickness = Result.withDefault 2.0 (String.toFloat value) } ! []
+            let
+                grid =
+                    model.grid
+
+                newGrid =
+                    { grid | boldThickness = Result.withDefault 2.0 (String.toFloat value) }
+            in
+                { model | grid = newGrid } ! []
 
         ThinThicknessChanged value ->
-            { model | thinThickness = Result.withDefault 2.0 (String.toFloat value) } ! []
+            let
+                grid =
+                    model.grid
+
+                newGrid =
+                    { grid | thinThickness = Result.withDefault 2.0 (String.toFloat value) }
+            in
+                { model | grid = newGrid } ! []
 
         CellSizeChanged value ->
-            { model | cellSize = Result.withDefault 2.0 (String.toFloat value) } ! []
+            let
+                grid =
+                    model.grid
+
+                newGrid =
+                    { grid | cellSize = Result.withDefault 2.0 (String.toFloat value) }
+            in
+                { model | grid = newGrid } ! []
 
         BoardMousePos pos ->
             model ! []

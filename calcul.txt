@@ -28,6 +28,7 @@ On rajoutera la moitié de l'épaisseur au x
 
 (N - 1) // 5 + 1
 
+(N + 4) // 5
 
 0 => 1
 1 => 1

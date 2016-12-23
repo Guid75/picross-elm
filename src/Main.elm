@@ -74,8 +74,9 @@ colorByCellType : CellType -> String
 colorByCellType cellType =
     case cellType of
         Full ->
-            "#383838" -- "black"
+            "#383838"
 
+        -- "black"
         Empty ->
             "darkgray"
 
@@ -103,22 +104,10 @@ drawCell model { col, row } cell =
     let
         { cellX, cellY } =
             Grid.getCellCoord col row model.grid
-
-        colThickness =
-            if col % 5 == 0 then
-                model.grid.boldThickness
-            else
-                model.grid.thinThickness
-
-        rowThickness =
-            if row % 5 == 0 then
-                model.grid.boldThickness
-            else
-                model.grid.thinThickness
     in
         rect
-            [ x <| toString <| cellX + colThickness / 2.0 + 1.0
-            , y <| toString <| cellY + rowThickness / 2.0 + 1.0
+            [ x <| toString <| cellX + 1.0
+            , y <| toString <| cellY + 1.0
             , width <| toString <| model.grid.cellSize - 2.0
             , height <| toString <| model.grid.cellSize - 2.0
             , fill <| colorByCellType cell.cellType
@@ -200,13 +189,6 @@ view model =
             , Html.text <| toString model.grid.cellSize
             ]
         ]
-
-
-
--- (drawCells model)
--- List.append (drawCells model)
---     []
--- text_ [ x "150", y "134", stroke "black", fill "black", fontSize "20px" ] [ Svg.text "1 12 3 4" ] ]
 
 
 toggleCell : Model -> Coord -> Model

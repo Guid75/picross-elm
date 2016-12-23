@@ -25,7 +25,7 @@ drawVerticalLine grid colIndex lines =
             getNthLineOffset grid colIndex
 
         thickness =
-            if colIndex % 5 == 0 then
+            if colIndex % grid.boldInterval == 0 then
                 grid.boldThickness
             else
                 grid.thinThickness
@@ -53,7 +53,7 @@ drawHorizontalLine grid rowIndex lines =
             getNthLineOffset grid rowIndex
 
         thickness =
-            if rowIndex % 5 == 0 then
+            if rowIndex % grid.boldInterval == 0 then
                 grid.boldThickness
             else
                 grid.thinThickness
@@ -72,12 +72,13 @@ drawHorizontalLine grid rowIndex lines =
 
 
 getNthLineOffset : Grid -> Int -> Float
-getNthLineOffset { cellSize, thinThickness, boldThickness } lineNumber =
+getNthLineOffset { cellSize, thinThickness, boldThickness, boldInterval } lineNumber =
     let
-        dec = (lineNumber + 4) // 5
+        dec =
+            (lineNumber + boldInterval - 1) // boldInterval
 
         thickness =
-            if lineNumber % 5 == 0 then
+            if lineNumber % boldInterval == 0 then
                 boldThickness
             else
                 thinThickness
@@ -95,7 +96,7 @@ getGridWidth grid =
             getNthLineOffset grid lastLineIndex
 
         thickness =
-            if lastLineIndex % 5 == 0 then
+            if lastLineIndex % grid.boldInterval == 0 then
                 grid.boldThickness
             else
                 grid.thinThickness
@@ -113,7 +114,7 @@ getGridHeight grid =
             getNthLineOffset grid lastLineIndex
 
         thickness =
-            if lastLineIndex % 5 == 0 then
+            if lastLineIndex % grid.boldInterval == 0 then
                 grid.boldThickness
             else
                 grid.thinThickness
@@ -138,6 +139,19 @@ drawGrid grid =
 
 getCellCoord : Int -> Int -> Grid -> { cellX : Float, cellY : Float }
 getCellCoord col row grid =
-    { cellX = getNthLineOffset grid col
-    , cellY = getNthLineOffset grid row
-    }
+    let
+        colThickness =
+            if col % grid.boldInterval == 0 then
+                grid.boldThickness
+            else
+                grid.thinThickness
+
+        rowThickness =
+            if row % grid.boldInterval == 0 then
+                grid.boldThickness
+            else
+                grid.thinThickness
+    in
+        { cellX = (getNthLineOffset grid col) + colThickness / 2.0
+        , cellY = (getNthLineOffset grid row) + rowThickness / 2.0
+        }

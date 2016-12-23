@@ -15,28 +15,27 @@ type alias Grid =
     }
 
 
+getThicknessByIndex : Grid -> Int -> Float
+getThicknessByIndex grid index =
+    if index % grid.boldInterval == 0 then
+        grid.boldThickness
+    else
+        grid.thinThickness
+
+
 drawVerticalLine : Grid -> Int -> List (Svg msg) -> List (Svg msg)
 drawVerticalLine grid colIndex lines =
     let
-        gridHeight =
-            getGridHeight grid
-
         x =
             getNthLineOffset grid colIndex
-
-        thickness =
-            if colIndex % grid.boldInterval == 0 then
-                grid.boldThickness
-            else
-                grid.thinThickness
     in
         (line
             [ x1 <| toString x
             , y1 "0.0"
             , x2 <| toString x
-            , y2 <| toString <| gridHeight
+            , y2 <| toString <| getGridHeight grid
             , stroke grid.strokeColor
-            , strokeWidth <| toString thickness
+            , strokeWidth <| toString <| getThicknessByIndex grid colIndex
             ]
             []
         )
@@ -46,25 +45,16 @@ drawVerticalLine grid colIndex lines =
 drawHorizontalLine : Grid -> Int -> List (Svg msg) -> List (Svg msg)
 drawHorizontalLine grid rowIndex lines =
     let
-        gridWidth =
-            getGridWidth grid
-
         y =
             getNthLineOffset grid rowIndex
-
-        thickness =
-            if rowIndex % grid.boldInterval == 0 then
-                grid.boldThickness
-            else
-                grid.thinThickness
     in
         (line
             [ x1 <| "0.0"
             , y1 <| toString y
-            , x2 <| toString <| gridWidth
+            , x2 <| toString <| getGridWidth grid
             , y2 <| toString y
             , stroke grid.strokeColor
-            , strokeWidth <| toString thickness
+            , strokeWidth <| toString <| getThicknessByIndex grid rowIndex
             ]
             []
         )
@@ -72,18 +62,15 @@ drawHorizontalLine grid rowIndex lines =
 
 
 getNthLineOffset : Grid -> Int -> Float
-getNthLineOffset { cellSize, thinThickness, boldThickness, boldInterval } lineNumber =
+getNthLineOffset grid lineNumber =
     let
         dec =
-            (lineNumber + boldInterval - 1) // boldInterval
+            (lineNumber + grid.boldInterval - 1) // grid.boldInterval
 
         thickness =
-            if lineNumber % boldInterval == 0 then
-                boldThickness
-            else
-                thinThickness
+            getThicknessByIndex grid lineNumber
     in
-        toFloat lineNumber * cellSize + toFloat (lineNumber - dec) * thinThickness + toFloat dec * boldThickness + thickness / 2.0
+        toFloat lineNumber * grid.cellSize + toFloat (lineNumber - dec) * grid.thinThickness + toFloat dec * grid.boldThickness + thickness / 2.0
 
 
 getGridWidth : Grid -> Float
@@ -96,10 +83,7 @@ getGridWidth grid =
             getNthLineOffset grid lastLineIndex
 
         thickness =
-            if lastLineIndex % grid.boldInterval == 0 then
-                grid.boldThickness
-            else
-                grid.thinThickness
+            getThicknessByIndex grid lastLineIndex
     in
         offset + thickness / 2.0
 
@@ -114,43 +98,27 @@ getGridHeight grid =
             getNthLineOffset grid lastLineIndex
 
         thickness =
-            if lastLineIndex % grid.boldInterval == 0 then
-                grid.boldThickness
-            else
-                grid.thinThickness
+            getThicknessByIndex grid lastLineIndex
     in
         offset + thickness / 2.0
 
 
 drawGrid : Grid -> List (Svg msg)
 drawGrid grid =
-    let
-        gridWidth =
-            getGridWidth grid
-
-        gridHeight =
-            getGridHeight grid
-    in
-        List.concat
-            [ (List.foldl (drawVerticalLine grid) [] (List.range 0 grid.colCount))
-            , (List.foldl (drawHorizontalLine grid) [] (List.range 0 grid.rowCount))
-            ]
+    List.concat
+        [ (List.foldl (drawVerticalLine grid) [] (List.range 0 grid.colCount))
+        , (List.foldl (drawHorizontalLine grid) [] (List.range 0 grid.rowCount))
+        ]
 
 
 getCellCoord : Int -> Int -> Grid -> { cellX : Float, cellY : Float }
 getCellCoord col row grid =
     let
         colThickness =
-            if col % grid.boldInterval == 0 then
-                grid.boldThickness
-            else
-                grid.thinThickness
+            getThicknessByIndex grid col
 
         rowThickness =
-            if row % grid.boldInterval == 0 then
-                grid.boldThickness
-            else
-                grid.thinThickness
+            getThicknessByIndex grid row
     in
         { cellX = (getNthLineOffset grid col) + colThickness / 2.0
         , cellY = (getNthLineOffset grid row) + rowThickness / 2.0

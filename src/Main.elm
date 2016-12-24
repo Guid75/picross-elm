@@ -5,7 +5,7 @@ import Html.Attributes
 import Html.Events
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Svg.Events exposing (onClick, onMouseDown, onMouseMove)
+import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
 import Matrix exposing (Matrix)
 import Array
 import Mouse
@@ -24,8 +24,8 @@ main =
 
 type Msg
     = NoOp
-    | ClickOnGrid
-    | ClickOnCell Coord
+    | MouseDownOnGrid
+    | MouseUpOnGrid
     | MouseMove { x : Int, y : Int }
     | BoardMousePos ( Int, Int )
     | BoldThicknessChanged String
@@ -33,11 +33,17 @@ type Msg
     | CellSizeChanged String
 
 
+type alias CellSelection =
+    { firstCell : Coord
+    , lastCell : Coord
+    }
+
+
 type alias Model =
     { board : Matrix Cell
     , grid : Grid
-    , clickCount : Int
     , hoveredCell : Maybe Coord
+    , selection : Maybe CellSelection
     }
 
 
@@ -89,8 +95,7 @@ colorByCellType cellType =
 init : ( Model, Cmd Msg )
 init =
     { board =
-        Matrix.repeat 17 20 (Cell Selected)
-    , clickCount = 0
+        Matrix.repeat 17 20 (Cell Empty)
     , grid =
         { colCount = 17
         , rowCount = 20
@@ -101,8 +106,47 @@ init =
         , cellSize = 20.0
         }
     , hoveredCell = Nothing
+    , selection = Nothing
     }
         ! []
+
+
+drawRect : Model -> Coord -> Svg Msg
+drawRect model { col, row } =
+    let
+        { cellX, cellY } =
+            Grid.getCellCoord col row model.grid
+    in
+        rect
+            [ x <| toString <| cellX + 1.0
+            , y <| toString <| cellY + 1.0
+            , width <| toString <| model.grid.cellSize - 2.0
+            , height <| toString <| model.grid.cellSize - 2.0
+            , fill "red"
+            ]
+            []
+
+
+drawHovered : Model -> List (Svg Msg)
+drawHovered model =
+    case model.hoveredCell of
+        Nothing ->
+            []
+
+        Just { col, row } ->
+            let
+                { cellX, cellY } =
+                    Grid.getCellCoord col row model.grid
+            in
+                [ rect
+                    [ x <| toString <| cellX
+                    , y <| toString <| cellY
+                    , width <| toString <| model.grid.cellSize
+                    , height <| toString <| model.grid.cellSize
+                    , fill "blue"
+                    ]
+                    []
+                ]
 
 
 drawCell : Model -> Coord -> Cell -> Svg Msg
@@ -124,8 +168,11 @@ drawCell model { col, row } cell =
 
         padding =
             case cell.cellType of
-                Empty -> 0.0
-                _ -> 1.0
+                Empty ->
+                    0.0
+
+                _ ->
+                    1.0
     in
         rect
             [ x <| toString <| cellX + padding
@@ -133,7 +180,6 @@ drawCell model { col, row } cell =
             , width <| toString <| model.grid.cellSize - 2.0 * padding
             , height <| toString <| model.grid.cellSize - 2.0 * padding
             , fill fillColor
-            , onClick (ClickOnCell { col = col, row = row })
             ]
             []
 
@@ -142,10 +188,57 @@ drawCells : Model -> List (Svg Msg)
 drawCells model =
     model.board
         |> Matrix.toIndexedArray
-        --        |> Array.filter (\( _, cell ) -> cell.cellType /= Empty)
-        |>
-            Array.map (\( ( col, row ), cell ) -> drawCell model { col = col, row = row } cell)
+        |> Array.filter (\( _, cell ) -> cell.cellType /= Empty)
+        |> Array.map (\( ( col, row ), cell ) -> drawCell model { col = col, row = row } cell)
         |> Array.toList
+
+
+selectionToRectangle : CellSelection -> ( Coord, Coord )
+selectionToRectangle selection =
+    let
+        ( col1, col2 ) =
+            if selection.firstCell.col <= selection.lastCell.col then
+                ( selection.firstCell.col, selection.lastCell.col )
+            else
+                ( selection.lastCell.col, selection.firstCell.col )
+
+        ( row1, row2 ) =
+            if selection.firstCell.row <= selection.lastCell.row then
+                ( selection.firstCell.row, selection.lastCell.row )
+            else
+                ( selection.lastCell.row, selection.firstCell.row )
+    in
+        ( { col = col1, row = row1 }, { col = col2, row = row2 } )
+
+
+selectionToList : CellSelection -> List Coord
+selectionToList selection =
+    let
+        ( topLeft, bottomRight ) =
+            selectionToRectangle selection
+
+        colList =
+            List.map ((+) topLeft.col) <| List.range 0 (bottomRight.col - topLeft.col)
+
+        rowList =
+            List.map ((+) topLeft.row) <| List.range 0 (bottomRight.row - topLeft.row)
+
+        foldRows col l =
+            List.foldl (\row l -> { col = col, row = row } :: l) l rowList
+    in
+        List.foldl foldRows [] colList
+
+
+drawSelection : Model -> List (Svg Msg)
+drawSelection model =
+    case model.selection of
+        Nothing ->
+            []
+
+        Just selection ->
+            selection
+                |> selectionToList
+                |> List.map (drawRect model)
 
 
 viewSvg : Model -> Html Msg
@@ -156,12 +249,16 @@ viewSvg model =
         , height "500"
         , viewBox "0 0 1024 500"
           --        , shapeRendering "crispEdges"
-        , onMouseDown ClickOnGrid
+        , onMouseDown MouseDownOnGrid
+        , onMouseUp MouseUpOnGrid
         ]
     <|
-        List.append
-            [ g [] <| Grid.drawGrid model.grid ]
-            (drawCells model)
+        List.concat
+            [ [ g [] <| Grid.drawGrid model.grid ]
+            , drawCells model
+            , drawHovered model
+            , drawSelection model
+            ]
 
 
 view : Model -> Html Msg
@@ -221,14 +318,65 @@ toggleCell model { col, row } =
             model
 
 
+mouseDownOnGrid : Model -> Model
+mouseDownOnGrid model =
+    let
+        coordToSelection : Coord -> CellSelection
+        coordToSelection coord =
+            { firstCell = coord, lastCell = coord }
+    in
+        { model | selection = Maybe.map coordToSelection model.hoveredCell }
+
+
+updateBoardWithSelection : Model -> Matrix Cell
+updateBoardWithSelection model =
+    case model.selection of
+        Nothing ->
+            model.board
+
+        Just selection ->
+            let
+                selList =
+                    selectionToList selection
+            in
+                List.foldr (\{ col, row } board -> Matrix.set col row (Cell Selected) board) model.board selList
+
+
+mouseUpOnGrid : Model -> Model
+mouseUpOnGrid model =
+    let
+        board =
+            updateBoardWithSelection model
+    in
+        { model
+            | selection = Nothing
+            , board = board
+        }
+
+
+boardMousePos : ( Int, Int ) -> Model -> Model
+boardMousePos ( x, y ) model =
+    let
+        hoveredCell =
+            Grid.getCellByXY (toFloat x) (toFloat y) model.grid
+
+        selection =
+            Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = Maybe.withDefault selection.lastCell hoveredCell }) model.selection
+    in
+        { model
+            | hoveredCell = hoveredCell
+            , selection = selection
+        }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case Debug.log "msg" msg of
-        ClickOnGrid ->
-            { model | clickCount = model.clickCount + 1 } ! []
+    case msg of
+        MouseDownOnGrid ->
+            mouseDownOnGrid model ! []
 
-        ClickOnCell coord ->
-            toggleCell model coord ! []
+        MouseUpOnGrid ->
+            mouseUpOnGrid model ! []
 
         MouseMove pos ->
             ( model, requestBoardMousePos ( pos.x, pos.y ) )
@@ -264,7 +412,7 @@ update msg model =
                 { model | grid = newGrid } ! []
 
         BoardMousePos pos ->
-            { model | hoveredCell = Grid.getCellByXY (toFloat (Tuple.first pos)) (toFloat (Tuple.second pos)) model.grid } ! []
+            boardMousePos pos model ! []
 
         NoOp ->
             model ! []

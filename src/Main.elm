@@ -5,7 +5,7 @@ import Html.Attributes
 import Html.Events
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
-import Svg.Events exposing (onClick, onMouseMove)
+import Svg.Events exposing (onClick, onMouseDown, onMouseMove)
 import Matrix exposing (Matrix)
 import Array
 import Mouse
@@ -37,6 +37,7 @@ type alias Model =
     { board : Matrix Cell
     , grid : Grid
     , clickCount : Int
+    , hoveredCell : Maybe Coord
     }
 
 
@@ -47,7 +48,8 @@ type alias Coord =
 
 
 type CellType
-    = Full
+    = Selected
+    | Rejected
     | Empty
 
 
@@ -73,8 +75,11 @@ gridColor =
 colorByCellType : CellType -> String
 colorByCellType cellType =
     case cellType of
-        Full ->
+        Selected ->
             "#383838"
+
+        Rejected ->
+            "red"
 
         -- "black"
         Empty ->
@@ -84,7 +89,7 @@ colorByCellType cellType =
 init : ( Model, Cmd Msg )
 init =
     { board =
-        Matrix.repeat 17 20 (Cell Full)
+        Matrix.repeat 17 20 (Cell Selected)
     , clickCount = 0
     , grid =
         { colCount = 17
@@ -95,6 +100,7 @@ init =
         , strokeColor = gridColor
         , cellSize = 20.0
         }
+    , hoveredCell = Nothing
     }
         ! []
 
@@ -104,16 +110,29 @@ drawCell model { col, row } cell =
     let
         { cellX, cellY } =
             Grid.getCellCoord col row model.grid
+
+        fillColor =
+            case model.hoveredCell of
+                Just coord ->
+                    if coord.col == col && coord.row == row then
+                        "blue"
+                    else
+                        colorByCellType cell.cellType
+
+                Nothing ->
+                    colorByCellType cell.cellType
+
+        padding =
+            case cell.cellType of
+                Empty -> 0.0
+                _ -> 1.0
     in
         rect
-            [ x <| toString <| cellX + 1.0
-            , y <| toString <| cellY + 1.0
-            , width <| toString <| model.grid.cellSize - 2.0
-            , height <| toString <| model.grid.cellSize - 2.0
-            , fill <| colorByCellType cell.cellType
-              -- , strokeWidth "0.5"
-              -- , strokeDasharray dashArray
-              -- , stroke "red"
+            [ x <| toString <| cellX + padding
+            , y <| toString <| cellY + padding
+            , width <| toString <| model.grid.cellSize - 2.0 * padding
+            , height <| toString <| model.grid.cellSize - 2.0 * padding
+            , fill fillColor
             , onClick (ClickOnCell { col = col, row = row })
             ]
             []
@@ -123,8 +142,9 @@ drawCells : Model -> List (Svg Msg)
 drawCells model =
     model.board
         |> Matrix.toIndexedArray
-        |> Array.filter (\( _, cell ) -> cell.cellType /= Empty)
-        |> Array.map (\( ( col, row ), cell ) -> drawCell model { col = col, row = row } cell)
+        --        |> Array.filter (\( _, cell ) -> cell.cellType /= Empty)
+        |>
+            Array.map (\( ( col, row ), cell ) -> drawCell model { col = col, row = row } cell)
         |> Array.toList
 
 
@@ -136,7 +156,7 @@ viewSvg model =
         , height "500"
         , viewBox "0 0 1024 500"
           --        , shapeRendering "crispEdges"
-        , onClick ClickOnGrid
+        , onMouseDown ClickOnGrid
         ]
     <|
         List.append
@@ -244,7 +264,7 @@ update msg model =
                 { model | grid = newGrid } ! []
 
         BoardMousePos pos ->
-            model ! []
+            { model | hoveredCell = Grid.getCellByXY (toFloat (Tuple.first pos)) (toFloat (Tuple.second pos)) model.grid } ! []
 
         NoOp ->
             model ! []

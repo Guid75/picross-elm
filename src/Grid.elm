@@ -1,4 +1,4 @@
-module Grid exposing (Grid, drawGrid, getCellCoord)
+module Grid exposing (Grid, drawGrid, getCellCoord, getCellByXY)
 
 import Svg exposing (Svg, line)
 import Svg.Attributes exposing (..)
@@ -123,3 +123,58 @@ getCellCoord col row grid =
         { cellX = (getNthLineOffset grid col) + colThickness / 2.0
         , cellY = (getNthLineOffset grid row) + rowThickness / 2.0
         }
+
+
+getColByX : Float -> Grid -> Maybe Int
+getColByX x grid =
+    let
+        getCol : Int -> Maybe Int
+        getCol col =
+            let
+                coord =
+                    getCellCoord col 0 grid
+            in
+                if col >= grid.colCount then
+                    Nothing
+                else if x >= coord.cellX && x <= coord.cellX + grid.cellSize then
+                    Just col
+                else
+                    getCol <| col + 1
+    in
+        getCol 0
+
+
+getRowByY : Float -> Grid -> Maybe Int
+getRowByY y grid =
+    let
+        getRow : Int -> Maybe Int
+        getRow row =
+            let
+                coord =
+                    getCellCoord 0 row grid
+            in
+                if row >= grid.rowCount then
+                    Nothing
+                else if y >= coord.cellY && y <= coord.cellY + grid.cellSize then
+                    Just row
+                else
+                    getRow <| row + 1
+    in
+        getRow 0
+
+
+getCellByXY : Float -> Float -> Grid -> Maybe { col : Int, row : Int }
+getCellByXY x y grid =
+    let
+        maybeCol =
+            getColByX x grid
+
+        maybeRow =
+            getRowByY y grid
+    in
+        case ( maybeCol, maybeRow ) of
+            ( Just col, Just row ) ->
+                Just { col = col, row = row }
+
+            _ ->
+                Nothing

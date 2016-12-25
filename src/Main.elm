@@ -27,7 +27,7 @@ type Msg
     | MouseDownOnGrid
     | MouseUpOnGrid
     | MouseMove { x : Int, y : Int }
-    | BoardMousePos ( Int, Int )
+    | BoardMousePos ( Float, Float )
     | BoldThicknessChanged String
     | ThinThicknessChanged String
     | CellSizeChanged String
@@ -354,11 +354,11 @@ mouseUpOnGrid model =
         }
 
 
-boardMousePos : ( Int, Int ) -> Model -> Model
+boardMousePos : ( Float, Float ) -> Model -> Model
 boardMousePos ( x, y ) model =
     let
         hoveredCell =
-            Grid.getCellByXY (toFloat x) (toFloat y) model.grid
+            Grid.getCellByXY x y model.grid
 
         selection =
             Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = Maybe.withDefault selection.lastCell hoveredCell }) model.selection
@@ -418,7 +418,7 @@ update msg model =
             model ! []
 
 
-port boardMousePosResult : (( Int, Int ) -> msg) -> Sub msg
+port boardMousePosResult : (( Float, Float ) -> msg) -> Sub msg
 
 
 port requestBoardMousePos : ( Int, Int ) -> Cmd msg

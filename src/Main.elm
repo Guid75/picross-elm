@@ -330,16 +330,42 @@ mouseDownOnGrid model =
 
 updateBoardWithSelection : Model -> Matrix Cell
 updateBoardWithSelection model =
-    case model.selection of
-        Nothing ->
-            model.board
+    let
+        toggleCell { col, row } board =
+            Matrix.update
+                col
+                row
+                (\cell ->
+                    Cell <|
+                        if cell.cellType == Selected then
+                            Empty
+                        else
+                            Selected
+                )
+                board
 
-        Just selection ->
-            let
-                selList =
-                    selectionToList selection
-            in
-                List.foldr (\{ col, row } board -> Matrix.set col row (Cell Selected) board) model.board selList
+        selectCell { col, row } board =
+            Matrix.update
+                col
+                row
+                (\cell ->
+                    Cell Selected
+                )
+                board
+    in
+        case model.selection of
+            Nothing ->
+                model.board
+
+            Just selection ->
+                let
+                    selList =
+                        selectionToList selection
+                in
+                    if List.length selList == 1 then
+                        List.foldr toggleCell model.board selList
+                    else
+                        List.foldr selectCell model.board selList
 
 
 mouseUpOnGrid : Model -> Model

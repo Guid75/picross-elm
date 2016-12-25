@@ -331,25 +331,18 @@ mouseDownOnGrid model =
 updateBoardWithSelection : Model -> Matrix Cell
 updateBoardWithSelection model =
     let
-        toggleCell { col, row } board =
-            Matrix.update
-                col
-                row
-                (\cell ->
-                    Cell <|
-                        if cell.cellType == Selected then
-                            Empty
-                        else
-                            Selected
-                )
-                board
+        toggleValue value =
+            if value == Selected then
+                Empty
+            else
+                Selected
 
-        selectCell { col, row } board =
+        setCell value { col, row } board =
             Matrix.update
                 col
                 row
-                (\cell ->
-                    Cell Selected
+                (\_ ->
+                    Cell value
                 )
                 board
     in
@@ -361,11 +354,13 @@ updateBoardWithSelection model =
                 let
                     selList =
                         selectionToList selection
+
+                    setValue =
+                        Matrix.get selection.firstCell.col selection.firstCell.row model.board
+                            |> Maybe.map (.cellType >> toggleValue)
+                            |> Maybe.withDefault Selected
                 in
-                    if List.length selList == 1 then
-                        List.foldr toggleCell model.board selList
-                    else
-                        List.foldr selectCell model.board selList
+                    List.foldr (setCell setValue) model.board selList
 
 
 mouseUpOnGrid : Model -> Model

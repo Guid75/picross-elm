@@ -6,6 +6,7 @@ import Html.Events
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
+import Json.Decode as Json
 import Matrix exposing (Matrix)
 import Array
 import Mouse
@@ -24,9 +25,9 @@ main =
 
 type Msg
     = NoOp
-    | MouseDownOnGrid
-    | MouseUpOnGrid
     | MouseMove { x : Int, y : Int }
+    | BoardMouseDown Int
+    | BoardMouseUp Int
     | BoardMousePos ( Float, Float )
     | BoldThicknessChanged String
     | ThinThicknessChanged String
@@ -249,8 +250,8 @@ viewSvg model =
         , height "500"
         , viewBox "0 0 1024 500"
           --        , shapeRendering "crispEdges"
-        , onMouseDown MouseDownOnGrid
-        , onMouseUp MouseUpOnGrid
+          -- , onMouseDown MouseDownOnGrid
+          -- , onMouseUp MouseUpOnGrid
         ]
     <|
         List.concat
@@ -318,14 +319,19 @@ toggleCell model { col, row } =
             model
 
 
-mouseDownOnGrid : Model -> Model
-mouseDownOnGrid model =
+mouseDownOnGrid : Int -> Model -> Model
+mouseDownOnGrid button model =
     let
         coordToSelection : Coord -> CellSelection
         coordToSelection coord =
             { firstCell = coord, lastCell = coord }
     in
-        { model | selection = Maybe.map coordToSelection model.hoveredCell }
+        case button of
+            1 ->
+                { model | selection = Maybe.map coordToSelection model.hoveredCell }
+
+            _ ->
+                model
 
 
 updateBoardWithSelection : Model -> Matrix Cell
@@ -363,16 +369,21 @@ updateBoardWithSelection model =
                     List.foldr (setCell setValue) model.board selList
 
 
-mouseUpOnGrid : Model -> Model
-mouseUpOnGrid model =
+mouseUpOnGrid : Int -> Model -> Model
+mouseUpOnGrid button model =
     let
         board =
             updateBoardWithSelection model
     in
-        { model
-            | selection = Nothing
-            , board = board
-        }
+        case button of
+            1 ->
+                { model
+                    | selection = Nothing
+                    , board = board
+                }
+
+            _ ->
+                model
 
 
 boardMousePos : ( Float, Float ) -> Model -> Model
@@ -392,12 +403,12 @@ boardMousePos ( x, y ) model =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        MouseDownOnGrid ->
-            mouseDownOnGrid model ! []
+    case Debug.log "msg" msg of
+        BoardMouseDown button ->
+            mouseDownOnGrid button model ! []
 
-        MouseUpOnGrid ->
-            mouseUpOnGrid model ! []
+        BoardMouseUp button ->
+            mouseUpOnGrid button model ! []
 
         MouseMove pos ->
             ( model, requestBoardMousePos ( pos.x, pos.y ) )
@@ -445,9 +456,17 @@ port boardMousePosResult : (( Float, Float ) -> msg) -> Sub msg
 port requestBoardMousePos : ( Int, Int ) -> Cmd msg
 
 
+port boardMouseDown : (Int -> msg) -> Sub msg
+
+
+port boardMouseUp : (Int -> msg) -> Sub msg
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ Mouse.moves MouseMove
         , boardMousePosResult BoardMousePos
+        , boardMouseDown BoardMouseDown
+        , boardMouseUp BoardMouseUp
         ]

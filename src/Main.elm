@@ -318,7 +318,13 @@ view : Model -> Html Msg
 view model =
     div
         []
-        [ viewSvg model
+        [ 
+        div
+            []
+            [ Html.text "Left button to select cells, "
+            , Html.text "Right button to reject cells"
+            ]
+        , viewSvg model
         , div
             []
             [ Html.text "Bold thickness"

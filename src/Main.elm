@@ -79,20 +79,6 @@ gridColor =
     "black"
 
 
-colorByCellType : CellType -> String
-colorByCellType cellType =
-    case cellType of
-        Selected ->
-            "#383838"
-
-        Rejected ->
-            "red"
-
-        -- "black"
-        Empty ->
-            "darkgray"
-
-
 init : ( Model, Cmd Msg )
 init =
     { board =
@@ -150,21 +136,29 @@ drawHovered model =
                 ]
 
 
-drawSelected : { cellX : Float, cellY : Float } -> Float -> Float -> String -> List (Svg Msg)
-drawSelected { cellX, cellY } cellSize padding fillColor =
-    [ rect
-        [ x <| toString <| cellX + padding
-        , y <| toString <| cellY + padding
-        , width <| toString <| cellSize - 2.0 * padding
-        , height <| toString <| cellSize - 2.0 * padding
-        , fill fillColor
+drawSelected : { cellX : Float, cellY : Float } -> Float -> Float -> List (Svg Msg)
+drawSelected { cellX, cellY } cellSize opacity =
+    let
+        padding =
+            1.0
+
+        color =
+            "#383838"
+    in
+        [ rect
+            [ x <| toString <| cellX + padding
+            , y <| toString <| cellY + padding
+            , width <| toString <| cellSize - 2.0 * padding
+            , height <| toString <| cellSize - 2.0 * padding
+            , fill color
+            , fillOpacity <| toString opacity
+            ]
+            []
         ]
-        []
-    ]
 
 
-drawRejected : { cellX : Float, cellY : Float } -> Float -> List (Svg Msg)
-drawRejected { cellX, cellY } cellSize =
+drawRejected : { cellX : Float, cellY : Float } -> Float -> Float -> List (Svg Msg)
+drawRejected { cellX, cellY } cellSize opacity =
     let
         padding =
             4.0
@@ -182,6 +176,7 @@ drawRejected { cellX, cellY } cellSize =
             , y2 <| toString <| cellY + cellSize - padding
             , stroke color
             , strokeWidth width
+            , strokeOpacity <| toString opacity
             , strokeLinecap "round"
             ]
             []
@@ -192,45 +187,27 @@ drawRejected { cellX, cellY } cellSize =
             , y2 <| toString <| cellY + padding
             , stroke color
             , strokeWidth width
+            , strokeOpacity <| toString opacity
             , strokeLinecap "round"
             ]
             []
         ]
 
 
-drawCell : Model -> Coord -> Cell -> Svg Msg
-drawCell model { col, row } cell =
+drawCell : Model -> Coord -> Cell -> Float -> Svg Msg
+drawCell model { col, row } cell opacity =
     let
         cellPos =
             Grid.getCellCoord col row model.grid
-
-        fillColor =
-            case model.hoveredCell of
-                Just coord ->
-                    if coord.col == col && coord.row == row then
-                        "blue"
-                    else
-                        colorByCellType cell.cellType
-
-                Nothing ->
-                    colorByCellType cell.cellType
-
-        padding =
-            case cell.cellType of
-                Empty ->
-                    0.0
-
-                _ ->
-                    1.0
     in
         g
             []
             (case cell.cellType of
                 Selected ->
-                    drawSelected cellPos model.grid.cellSize padding fillColor
+                    drawSelected cellPos model.grid.cellSize opacity
 
                 Rejected ->
-                    drawRejected cellPos model.grid.cellSize
+                    drawRejected cellPos model.grid.cellSize opacity
 
                 _ ->
                     []
@@ -242,7 +219,7 @@ drawCells model =
     model.board
         |> Matrix.toIndexedArray
         |> Array.filter (\( _, cell ) -> cell.cellType /= Empty)
-        |> Array.map (\( ( col, row ), cell ) -> drawCell model { col = col, row = row } cell)
+        |> Array.map (\( ( col, row ), cell ) -> drawCell model { col = col, row = row } cell 1.0)
         |> Array.toList
 
 
@@ -302,15 +279,13 @@ viewSvg model =
         , height "500"
         , viewBox "0 0 1024 500"
           --        , shapeRendering "crispEdges"
-          -- , onMouseDown MouseDownOnGrid
-          -- , onMouseUp MouseUpOnGrid
         ]
     <|
         List.concat
             [ [ g [] <| Grid.drawGrid model.grid ]
             , drawCells model
-            , drawHovered model
             , drawSelection model
+            , drawHovered model
             ]
 
 
@@ -318,8 +293,7 @@ view : Model -> Html Msg
 view model =
     div
         []
-        [ 
-        div
+        [ div
             []
             [ Html.text "Left button to select cells, "
             , Html.text "Right button to reject cells"

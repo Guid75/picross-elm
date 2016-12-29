@@ -150,10 +150,58 @@ drawHovered model =
                 ]
 
 
+drawSelected : { cellX : Float, cellY : Float } -> Float -> Float -> String -> List (Svg Msg)
+drawSelected { cellX, cellY } cellSize padding fillColor =
+    [ rect
+        [ x <| toString <| cellX + padding
+        , y <| toString <| cellY + padding
+        , width <| toString <| cellSize - 2.0 * padding
+        , height <| toString <| cellSize - 2.0 * padding
+        , fill fillColor
+        ]
+        []
+    ]
+
+
+drawRejected : { cellX : Float, cellY : Float } -> Float -> List (Svg Msg)
+drawRejected { cellX, cellY } cellSize =
+    let
+        padding =
+            4.0
+
+        color =
+            "red"
+
+        width =
+            "4.0"
+    in
+        [ line
+            [ x1 <| toString <| cellX + padding
+            , y1 <| toString <| cellY + padding
+            , x2 <| toString <| cellX + cellSize - padding
+            , y2 <| toString <| cellY + cellSize - padding
+            , stroke color
+            , strokeWidth width
+            , strokeLinecap "round"
+            ]
+            []
+        , line
+            [ x1 <| toString <| cellX + padding
+            , y1 <| toString <| cellY + cellSize - padding
+            , x2 <| toString <| cellX + cellSize - padding
+            , y2 <| toString <| cellY + padding
+            , stroke color
+            , strokeWidth width
+            , strokeLinecap "round"
+            ]
+            []
+        ]
+
+
 drawCell : Model -> Coord -> Cell -> Svg Msg
 drawCell model { col, row } cell =
     let
-        { cellX, cellY } =
+        cellPos =
             Grid.getCellCoord col row model.grid
 
         fillColor =
@@ -175,14 +223,18 @@ drawCell model { col, row } cell =
                 _ ->
                     1.0
     in
-        rect
-            [ x <| toString <| cellX + padding
-            , y <| toString <| cellY + padding
-            , width <| toString <| model.grid.cellSize - 2.0 * padding
-            , height <| toString <| model.grid.cellSize - 2.0 * padding
-            , fill fillColor
-            ]
+        g
             []
+            (case cell.cellType of
+                Selected ->
+                    drawSelected cellPos model.grid.cellSize padding fillColor
+
+                Rejected ->
+                    drawRejected cellPos model.grid.cellSize
+
+                _ ->
+                    []
+            )
 
 
 drawCells : Model -> List (Svg Msg)
@@ -319,29 +371,24 @@ toggleCell model { col, row } =
             model
 
 
-mouseDownOnGrid : Int -> Model -> Model
-mouseDownOnGrid button model =
+mouseDownOnGrid : Model -> Model
+mouseDownOnGrid model =
     let
         coordToSelection : Coord -> CellSelection
         coordToSelection coord =
             { firstCell = coord, lastCell = coord }
     in
-        case button of
-            1 ->
-                { model | selection = Maybe.map coordToSelection model.hoveredCell }
-
-            _ ->
-                model
+        { model | selection = Maybe.map coordToSelection model.hoveredCell }
 
 
-updateBoardWithSelection : Model -> Matrix Cell
-updateBoardWithSelection model =
+updateBoardWithSelection : Model -> CellType -> Matrix Cell
+updateBoardWithSelection model cellType =
     let
         toggleValue value =
-            if value == Selected then
+            if value == cellType then
                 Empty
             else
-                Selected
+                cellType
 
         setCell value { col, row } board =
             Matrix.update
@@ -372,18 +419,21 @@ updateBoardWithSelection model =
 mouseUpOnGrid : Int -> Model -> Model
 mouseUpOnGrid button model =
     let
-        board =
-            updateBoardWithSelection model
-    in
-        case button of
-            1 ->
-                { model
-                    | selection = Nothing
-                    , board = board
-                }
+        value =
+            case button of
+                1 ->
+                    Selected
 
-            _ ->
-                model
+                _ ->
+                    Rejected
+
+        board =
+            updateBoardWithSelection model value
+    in
+        { model
+            | selection = Nothing
+            , board = board
+        }
 
 
 boardMousePos : ( Float, Float ) -> Model -> Model
@@ -403,9 +453,9 @@ boardMousePos ( x, y ) model =
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case Debug.log "msg" msg of
+    case msg of
         BoardMouseDown button ->
-            mouseDownOnGrid button model ! []
+            mouseDownOnGrid model ! []
 
         BoardMouseUp button ->
             mouseUpOnGrid button model ! []

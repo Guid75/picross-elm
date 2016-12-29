@@ -91,6 +91,7 @@ init =
         , thinThickness = 1.0
         , strokeColor = gridColor
         , cellSize = 20.0
+        , topLeft = { x = 200.0, y = 50.0 }
         }
     , hoveredCell = Nothing
     , selection = Nothing

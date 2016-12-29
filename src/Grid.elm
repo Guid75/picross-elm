@@ -1,4 +1,4 @@
-module Grid exposing (Grid, drawGrid, getCellCoord, getCellByXY)
+module Grid exposing (Grid, drawGrid, getCellCoord, getCellByXY, FloatCoord)
 
 import Svg exposing (Svg, line)
 import Svg.Attributes exposing (..)
@@ -11,7 +11,14 @@ type alias Grid =
     , thinThickness : Float
     , boldThickness : Float
     , cellSize : Float
+    , topLeft : FloatCoord
     , strokeColor : String
+    }
+
+
+type alias FloatCoord =
+    { x : Float
+    , y : Float
     }
 
 
@@ -30,10 +37,10 @@ drawVerticalLine grid colIndex lines =
             getNthLineOffset grid colIndex
     in
         (line
-            [ x1 <| toString x
-            , y1 "0.0"
-            , x2 <| toString x
-            , y2 <| toString <| getGridHeight grid
+            [ x1 <| toString <| x + grid.topLeft.x
+            , y1 <| toString grid.topLeft.y
+            , x2 <| toString <| x + grid.topLeft.x
+            , y2 <| toString <| getGridHeight grid + grid.topLeft.y
             , stroke grid.strokeColor
             , strokeWidth <| toString <| getThicknessByIndex grid colIndex
             ]
@@ -49,10 +56,10 @@ drawHorizontalLine grid rowIndex lines =
             getNthLineOffset grid rowIndex
     in
         (line
-            [ x1 <| "0.0"
-            , y1 <| toString y
-            , x2 <| toString <| getGridWidth grid
-            , y2 <| toString y
+            [ x1 <| toString grid.topLeft.x
+            , y1 <| toString <| y + grid.topLeft.y
+            , x2 <| toString <| getGridWidth grid + grid.topLeft.x
+            , y2 <| toString <| y + grid.topLeft.y
             , stroke grid.strokeColor
             , strokeWidth <| toString <| getThicknessByIndex grid rowIndex
             ]
@@ -120,8 +127,8 @@ getCellCoord col row grid =
         rowThickness =
             getThicknessByIndex grid row
     in
-        { cellX = (getNthLineOffset grid col) + colThickness / 2.0
-        , cellY = (getNthLineOffset grid row) + rowThickness / 2.0
+        { cellX = (getNthLineOffset grid col) + colThickness / 2.0 + grid.topLeft.x
+        , cellY = (getNthLineOffset grid row) + rowThickness / 2.0 + grid.topLeft.y
         }
 
 

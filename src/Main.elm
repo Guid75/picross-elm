@@ -1,6 +1,6 @@
 port module Picross exposing (..)
 
-import Html exposing (text, div, Html, input)
+import Html exposing (select, option, text, div, Html, input)
 import Html.Attributes
 import Html.Events
 import Svg exposing (..)
@@ -8,6 +8,7 @@ import Svg.Attributes exposing (..)
 import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
 import Json.Decode as Json
 import Matrix exposing (Matrix)
+import Http
 import Array
 import Mouse
 import Grid exposing (Grid)
@@ -32,6 +33,8 @@ type Msg
     | BoldThicknessChanged String
     | ThinThicknessChanged String
     | CellSizeChanged String
+    | LevelsList (Result Http.Error (List String))
+    | ChoseLevel String
 
 
 type alias CellSelection =
@@ -45,6 +48,8 @@ type alias Model =
     , grid : Grid
     , hoveredCell : Maybe Coord
     , selection : Maybe CellSelection
+    , levelsList : Maybe (List String)
+    , currentLevel : Maybe String
     }
 
 
@@ -61,7 +66,9 @@ type CellType
 
 
 type alias Cell =
-    { cellType : CellType }
+    { userChoice : CellType
+    , value : Bool
+    }
 
 
 gridThinStroke : Float
@@ -82,7 +89,7 @@ gridColor =
 init : ( Model, Cmd Msg )
 init =
     { board =
-        Matrix.repeat 17 20 (Cell Empty)
+        Matrix.repeat 17 20 (Cell Empty False)
     , grid =
         { colCount = 17
         , rowCount = 20
@@ -95,8 +102,43 @@ init =
         }
     , hoveredCell = Nothing
     , selection = Nothing
+    , levelsList = Nothing
+    , currentLevel = Nothing
     }
-        ! []
+        ! [ getLevelsList ]
+
+
+decodeLevelsList : Json.Decoder (List String)
+decodeLevelsList =
+    Json.field "levels" (Json.list Json.string)
+
+
+getLevelsList : Cmd Msg
+getLevelsList =
+    let
+        url =
+            "levels/levels.json"
+
+        request =
+            Http.get url decodeLevelsList
+    in
+        Http.send LevelsList request
+
+
+-- decodeLevel : Json.Decoder (Matrix Cell)
+-- decodeLevel =
+    
+              
+-- loadLevel : String -> Cmd Msg
+-- loadLevel name =
+--     let
+--         url =
+--             "levels/" ++ name ++ ".json"
+
+--         request =
+--             Http.get url decodeLevel
+--     in
+--         Http.send LevelLoaded request
 
 
 drawRect : Model -> Coord -> Svg Msg
@@ -203,7 +245,7 @@ drawCell model { col, row } cell opacity =
     in
         g
             []
-            (case cell.cellType of
+            (case cell.userChoice of
                 Selected ->
                     drawSelected cellPos model.grid.cellSize opacity
 
@@ -219,9 +261,53 @@ drawCells : Model -> List (Svg Msg)
 drawCells model =
     model.board
         |> Matrix.toIndexedArray
-        |> Array.filter (\( _, cell ) -> cell.cellType /= Empty)
+        |> Array.filter (\( _, cell ) -> cell.userChoice /= Empty)
         |> Array.map (\( ( col, row ), cell ) -> drawCell model { col = col, row = row } cell 1.0)
         |> Array.toList
+
+
+drawLabels : Model -> List (Svg Msg)
+drawLabels model =
+    let
+        cellPos =
+            Grid.getCellCoord 0 1 model.grid
+
+        textRight =
+            toString <| model.grid.topLeft.x - 2.0
+    in
+        [ g
+            [ textAnchor "end"
+            , fontSize <| (toString <| model.grid.cellSize) ++ "px"
+            ]
+            [ Svg.text_
+                [ x textRight
+                , y <| toString <| (Grid.getCellCoord 0 0 model.grid).cellY + model.grid.cellSize / 2.0
+                ]
+                [ tspan
+                    [ dominantBaseline "central" ]
+                    -- baselineShift "-0.5ex"
+                    [ Svg.text "11 4 5 " ]
+                ]
+              -- , line
+              --     [ x1 "0.0"
+              --     , y1 <| toString <| (Grid.getCellCoord 0 0 model.grid).cellY + model.grid.cellSize / 2.0
+              --     , x2 textRight
+              --     , y2 <| toString <| (Grid.getCellCoord 0 0 model.grid).cellY + model.grid.cellSize / 2.0
+              --     , stroke "red"
+              --     ]
+              --     []
+            , Svg.text_
+                [ x textRight
+                , y <| toString <| cellPos.cellY + model.grid.cellSize - 4.0
+                ]
+                [ Svg.text "1 1 2 4 5 " ]
+            , Svg.text_
+                [ x textRight
+                , y <| toString <| (Grid.getCellCoord 0 2 model.grid).cellY + model.grid.cellSize - 4.0
+                ]
+                [ Svg.text "1 1 1 14 5 " ]
+            ]
+        ]
 
 
 selectionToRectangle : CellSelection -> ( Coord, Coord )
@@ -284,10 +370,32 @@ viewSvg model =
     <|
         List.concat
             [ [ g [] <| Grid.drawGrid model.grid ]
+            , drawLabels model
             , drawCells model
             , drawSelection model
             , drawHovered model
             ]
+
+
+levelsDecoder : Json.Decoder Msg
+levelsDecoder =
+    Json.map ChoseLevel Html.Events.targetValue
+
+
+levelsCombo : Model -> Html Msg
+levelsCombo model =
+    let
+        options =
+            case model.levelsList of
+                Nothing ->
+                    [ option [] [ Html.text "<no levels>" ] ]
+
+                Just levelsList ->
+                    List.map (\name -> option [ Html.Attributes.value name ] [ Html.text name ]) levelsList
+    in
+        select
+            [ Html.Events.on "change" levelsDecoder ]
+            options
 
 
 view : Model -> Html Msg
@@ -300,6 +408,9 @@ view model =
             , Html.text "Right button to reject cells"
             ]
         , viewSvg model
+        , div
+            []
+            [ Html.text "Levels ", levelsCombo model ]
         , div
             []
             [ Html.text "Bold thickness"
@@ -346,7 +457,7 @@ toggleCell : Model -> Coord -> Model
 toggleCell model { col, row } =
     case Matrix.get col row model.board of
         Just cell ->
-            { model | board = Matrix.set col row { cell | cellType = Empty } model.board }
+            { model | board = Matrix.set col row { cell | userChoice = Empty } model.board }
 
         Nothing ->
             model
@@ -375,8 +486,8 @@ updateBoardWithSelection model cellType =
             Matrix.update
                 col
                 row
-                (\_ ->
-                    Cell value
+                (\cell ->
+                    { cell | userChoice = value }
                 )
                 board
     in
@@ -391,7 +502,7 @@ updateBoardWithSelection model cellType =
 
                     setValue =
                         Matrix.get selection.firstCell.col selection.firstCell.row model.board
-                            |> Maybe.map (.cellType >> toggleValue)
+                            |> Maybe.map (.userChoice >> toggleValue)
                             |> Maybe.withDefault Selected
                 in
                     List.foldr (setCell setValue) model.board selList
@@ -476,6 +587,15 @@ update msg model =
 
         BoardMousePos pos ->
             boardMousePos pos model ! []
+
+        LevelsList (Ok levelsList) ->
+            { model | levelsList = Just levelsList } ! []
+
+        LevelsList (Err _) ->
+            model ! []
+
+        ChoseLevel level ->
+            { model | currentLevel = Just level } ! [] -- loadLevel level ]
 
         NoOp ->
             model ! []

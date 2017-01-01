@@ -27,11 +27,25 @@ crossLevel =
     }
 
 
+squareLevel : Level
+squareLevel =
+    { name = "round"
+    , description = "a level with a round form"
+    , content =
+        [ [ False, False, False, False, False ]
+        , [ False, True, True, True, False ]
+        , [ False, True, True, True, False ]
+        , [ False, True, True, True, False ]
+        , [ False, False, False, False, False ]
+        ]
+    }
+
+
 levelTests : Test
 levelTests =
     describe "Levels"
         [ describe "getLevelHorizontalTips"
-            [ test "Foo" <|
+            [ test "Cross" <|
                 \() ->
                     Expect.equal
                         (Level.getLevelHorizontalTips crossLevel)
@@ -40,6 +54,16 @@ levelTests =
                         , [ 1 ]
                         , [ 1, 1 ]
                         , [ 1, 1, 1 ]
+                        ]
+            , test "Square" <|
+                \() ->
+                    Expect.equal
+                        (Level.getLevelHorizontalTips squareLevel)
+                        [ []
+                        , [ 3 ]
+                        , [ 3 ]
+                        , [ 3 ]
+                        , []
                         ]
             ]
         ]

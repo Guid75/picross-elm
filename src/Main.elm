@@ -6,12 +6,15 @@ import Html.Events
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
-import Json.Decode as Json
+import Json.Decode exposing (int, string, list, Decoder)
+import Json.Decode.Pipeline exposing (decode, required, optional)
 import Matrix exposing (Matrix)
 import Http
 import Array
 import Mouse
 import Grid exposing (Grid)
+import Types exposing (Coord, CellType(..), Cell, CellSelection, Level)
+import Level
 
 
 main : Program Never Model Msg
@@ -33,14 +36,8 @@ type Msg
     | BoldThicknessChanged String
     | ThinThicknessChanged String
     | CellSizeChanged String
-    | LevelsList (Result Http.Error (List String))
+    | GetLevels (Result Http.Error (List Level))
     | ChoseLevel String
-
-
-type alias CellSelection =
-    { firstCell : Coord
-    , lastCell : Coord
-    }
 
 
 type alias Model =
@@ -48,26 +45,8 @@ type alias Model =
     , grid : Grid
     , hoveredCell : Maybe Coord
     , selection : Maybe CellSelection
-    , levelsList : Maybe (List String)
+    , levels : Maybe (List Level)
     , currentLevel : Maybe String
-    }
-
-
-type alias Coord =
-    { col : Int
-    , row : Int
-    }
-
-
-type CellType
-    = Selected
-    | Rejected
-    | Empty
-
-
-type alias Cell =
-    { userChoice : CellType
-    , value : Bool
     }
 
 
@@ -102,44 +81,40 @@ init =
         }
     , hoveredCell = Nothing
     , selection = Nothing
-    , levelsList = Nothing
+    , levels = Nothing
     , currentLevel = Nothing
     }
-        ! [ getLevelsList ]
+        ! [ getLevels ]
 
 
-decodeLevelsList : Json.Decoder (List String)
-decodeLevelsList =
-    Json.field "levels" (Json.list Json.string)
+int2BoolConverter : Decoder Bool
+int2BoolConverter =
+    Json.Decode.map (\v -> v > 0) int
 
 
-getLevelsList : Cmd Msg
-getLevelsList =
+decodeLevel : Decoder Level
+decodeLevel =
+    decode Level
+        |> required "name" Json.Decode.string
+        |> optional "description" Json.Decode.string ""
+        |> required "content" (list <| list int2BoolConverter)
+
+
+decodeLevels : Decoder (List Level)
+decodeLevels =
+    list decodeLevel
+
+
+getLevels : Cmd Msg
+getLevels =
     let
         url =
             "levels/levels.json"
 
         request =
-            Http.get url decodeLevelsList
+            Http.get url decodeLevels
     in
-        Http.send LevelsList request
-
-
--- decodeLevel : Json.Decoder (Matrix Cell)
--- decodeLevel =
-    
-              
--- loadLevel : String -> Cmd Msg
--- loadLevel name =
---     let
---         url =
---             "levels/" ++ name ++ ".json"
-
---         request =
---             Http.get url decodeLevel
---     in
---         Http.send LevelLoaded request
-
+        Http.send GetLevels request
 
 drawRect : Model -> Coord -> Svg Msg
 drawRect model { col, row } =
@@ -377,21 +352,33 @@ viewSvg model =
             ]
 
 
-levelsDecoder : Json.Decoder Msg
+levelsDecoder : Decoder Msg
 levelsDecoder =
-    Json.map ChoseLevel Html.Events.targetValue
+    Json.Decode.map ChoseLevel Html.Events.targetValue
 
 
 levelsCombo : Model -> Html Msg
 levelsCombo model =
     let
+        getLevelCaption level =
+            if level.description == "" then
+                level.name
+            else
+                level.name ++ " (" ++ level.description ++ ")"
+
         options =
-            case model.levelsList of
+            case model.levels of
                 Nothing ->
                     [ option [] [ Html.text "<no levels>" ] ]
 
-                Just levelsList ->
-                    List.map (\name -> option [ Html.Attributes.value name ] [ Html.text name ]) levelsList
+                Just levels ->
+                    List.map
+                        (\level ->
+                            option
+                                [ Html.Attributes.value level.name ]
+                                [ Html.text <| getLevelCaption level ]
+                        )
+                        levels
     in
         select
             [ Html.Events.on "change" levelsDecoder ]
@@ -543,6 +530,38 @@ boardMousePos ( x, y ) model =
         }
 
 
+applyBoolBoard : Model -> Matrix Bool -> Model
+applyBoolBoard model board =
+    let
+        boolToCell bool =
+            { userChoice = Empty, value = bool }
+
+        grid =
+            model.grid
+    in
+        { model
+            | board = Matrix.map boolToCell board
+            , grid =
+                { grid
+                    | colCount = Matrix.width board
+                    , rowCount = Matrix.height board
+                }
+        }
+
+
+choseLevel : String -> Model -> Model
+choseLevel levelName model =
+    let
+        maybeModel =
+            model.levels
+                |> Maybe.andThen (Level.getLevelByName levelName)
+                |> Maybe.andThen (\level -> Matrix.fromList level.content)
+                |> Maybe.andThen (\board -> Just <| applyBoolBoard model board)
+                |> Maybe.andThen (\model -> Just { model | currentLevel = Just levelName })
+    in
+        Maybe.withDefault model maybeModel
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -588,14 +607,23 @@ update msg model =
         BoardMousePos pos ->
             boardMousePos pos model ! []
 
-        LevelsList (Ok levelsList) ->
-            { model | levelsList = Just levelsList } ! []
+        GetLevels (Ok levels) ->
+            let
+                newModel =
+                    { model | levels = Just levels }
+            in
+                case newModel.levels |> Maybe.andThen List.head of
+                    Just level ->
+                        choseLevel level.name newModel ! []
 
-        LevelsList (Err _) ->
+                    Nothing ->
+                        newModel ! []
+
+        GetLevels (Err _) ->
             model ! []
 
         ChoseLevel level ->
-            { model | currentLevel = Just level } ! [] -- loadLevel level ]
+            choseLevel level model ! []
 
         NoOp ->
             model ! []

@@ -1,4 +1,9 @@
-module Level exposing (getHorizontalTips, getVerticalTips, getLevelByName)
+module Level
+    exposing
+        ( getHorizontalTips
+        , getVerticalTips
+        , getLevelByName
+        )
 
 import List.Extra
 import Matrix exposing (Matrix)
@@ -6,13 +11,23 @@ import Array exposing (Array)
 import Types exposing (Level)
 
 
-getBoolArrayTips : Array Bool -> List Int
+boolToInt : Bool -> Int
+boolToInt b =
+    case b of
+        True ->
+            1
+
+        False ->
+            0
+
+
+getBoolArrayTips : List Bool -> List Int
 getBoolArrayTips row =
     row
-        |> Array.toList
+        |> List.map boolToInt
         |> List.Extra.group
-        |> List.filter (\group -> List.head group == Just True)
-        |> List.map List.length
+        |> List.map List.sum
+        |> List.filter (flip (>) 0)
 
 
 getHorizontalTips : Matrix Bool -> List (List Int)
@@ -23,7 +38,7 @@ getHorizontalTips matrix =
             List.range 0 (Matrix.height matrix - 1)
                 |> List.filterMap (\rowIndex -> Matrix.getRow rowIndex matrix)
     in
-        List.map getBoolArrayTips rows
+        List.map (Array.toList >> getBoolArrayTips) rows
 
 
 getVerticalTips : Matrix Bool -> List (List Int)
@@ -34,9 +49,9 @@ getVerticalTips matrix =
             List.range 0 (Matrix.width matrix - 1)
                 |> List.filterMap (\colIndex -> Matrix.getColumn colIndex matrix)
     in
-        List.map getBoolArrayTips columns
+        List.map (Array.toList >> getBoolArrayTips) columns
 
 
 getLevelByName : String -> List Level -> Maybe Level
 getLevelByName name levels =
-    List.Extra.find (\level -> level.name == name) levels
+    List.Extra.find (.name >> (==) name) levels

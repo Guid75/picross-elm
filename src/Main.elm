@@ -242,12 +242,9 @@ drawCells model =
         |> Array.toList
 
 
-drawLabels : Model -> List (Svg Msg)
-drawLabels model =
+drawHorizontalLabels : Model -> List (Svg Msg)
+drawHorizontalLabels model =
     let
-        cellPos =
-            Grid.getCellCoord 0 1 model.grid
-
         textRight =
             toString <| model.grid.topLeft.x - 2.0
 
@@ -257,16 +254,17 @@ drawLabels model =
         getTipsLine : Int -> List Int -> Svg Msg
         getTipsLine index tips =
             let
-                text = List.map toString tips |> String.join " "
+                text =
+                    List.map toString tips |> String.join " "
             in
-             Svg.text_
-                [ x textRight
-                , y <| toString <| (Grid.getCellCoord 0 index model.grid).cellY + model.grid.cellSize / 2.0
-                ]
-                [ tspan
-                    [ dominantBaseline "central" ]
-                    [ Svg.text text ]
-                ]
+                Svg.text_
+                    [ x textRight
+                    , y <| toString <| (Grid.getCellCoord 0 index model.grid).cellY + model.grid.cellSize / 2.0
+                    ]
+                    [ tspan
+                        [ dominantBaseline "central" ]
+                        [ Svg.text text ]
+                    ]
     in
         [ g
             [ textAnchor "end"
@@ -336,7 +334,7 @@ viewSvg model =
     <|
         List.concat
             [ [ g [] <| Grid.drawGrid model.grid ]
-            , drawLabels model
+            , drawHorizontalLabels model
             , drawCells model
             , drawSelection model
             , drawHovered model

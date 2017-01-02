@@ -116,6 +116,7 @@ getLevels =
     in
         Http.send GetLevels request
 
+
 drawRect : Model -> Coord -> Svg Msg
 drawRect model { col, row } =
     let
@@ -249,39 +250,29 @@ drawLabels model =
 
         textRight =
             toString <| model.grid.topLeft.x - 2.0
+
+        allTips =
+            Level.getHorizontalTips <| Matrix.map .value model.board
+
+        getTipsLine : Int -> List Int -> Svg Msg
+        getTipsLine index tips =
+            let
+                text = List.map toString tips |> String.join " "
+            in
+             Svg.text_
+                [ x textRight
+                , y <| toString <| (Grid.getCellCoord 0 index model.grid).cellY + model.grid.cellSize / 2.0
+                ]
+                [ tspan
+                    [ dominantBaseline "central" ]
+                    [ Svg.text text ]
+                ]
     in
         [ g
             [ textAnchor "end"
             , fontSize <| (toString <| model.grid.cellSize) ++ "px"
             ]
-            [ Svg.text_
-                [ x textRight
-                , y <| toString <| (Grid.getCellCoord 0 0 model.grid).cellY + model.grid.cellSize / 2.0
-                ]
-                [ tspan
-                    [ dominantBaseline "central" ]
-                    -- baselineShift "-0.5ex"
-                    [ Svg.text "11 4 5 " ]
-                ]
-              -- , line
-              --     [ x1 "0.0"
-              --     , y1 <| toString <| (Grid.getCellCoord 0 0 model.grid).cellY + model.grid.cellSize / 2.0
-              --     , x2 textRight
-              --     , y2 <| toString <| (Grid.getCellCoord 0 0 model.grid).cellY + model.grid.cellSize / 2.0
-              --     , stroke "red"
-              --     ]
-              --     []
-            , Svg.text_
-                [ x textRight
-                , y <| toString <| cellPos.cellY + model.grid.cellSize - 4.0
-                ]
-                [ Svg.text "1 1 2 4 5 " ]
-            , Svg.text_
-                [ x textRight
-                , y <| toString <| (Grid.getCellCoord 0 2 model.grid).cellY + model.grid.cellSize - 4.0
-                ]
-                [ Svg.text "1 1 1 14 5 " ]
-            ]
+            (List.indexedMap getTipsLine allTips)
         ]
 
 

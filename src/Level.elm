@@ -21,6 +21,14 @@ boolToInt b =
             0
 
 
+withDefaultZero : List Int -> List Int
+withDefaultZero list =
+    if List.isEmpty list then
+        [ 0 ]
+    else
+        list
+
+
 getBoolArrayTips : List Bool -> List Int
 getBoolArrayTips row =
     row
@@ -28,28 +36,29 @@ getBoolArrayTips row =
         |> List.Extra.group
         |> List.map List.sum
         |> List.filter (flip (>) 0)
+        |> withDefaultZero
+
+
+getRows : Matrix Bool -> List (Array Bool)
+getRows matrix =
+    List.range 0 (Matrix.height matrix - 1)
+        |> List.filterMap (flip Matrix.getRow matrix)
+
+
+getColumns : Matrix Bool -> List (Array Bool)
+getColumns matrix =
+    List.range 0 (Matrix.width matrix - 1)
+        |> List.filterMap (flip Matrix.getColumn matrix)
 
 
 getHorizontalTips : Matrix Bool -> List (List Int)
 getHorizontalTips matrix =
-    let
-        rows : List (Array Bool)
-        rows =
-            List.range 0 (Matrix.height matrix - 1)
-                |> List.filterMap (\rowIndex -> Matrix.getRow rowIndex matrix)
-    in
-        List.map (Array.toList >> getBoolArrayTips) rows
+    List.map (Array.toList >> getBoolArrayTips) <| getRows matrix
 
 
 getVerticalTips : Matrix Bool -> List (List Int)
 getVerticalTips matrix =
-    let
-        columns : List (Array Bool)
-        columns =
-            List.range 0 (Matrix.width matrix - 1)
-                |> List.filterMap (\colIndex -> Matrix.getColumn colIndex matrix)
-    in
-        List.map (Array.toList >> getBoolArrayTips) columns
+    List.map (Array.toList >> getBoolArrayTips) <| getColumns matrix
 
 
 getLevelByName : String -> List Level -> Maybe Level

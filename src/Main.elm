@@ -294,7 +294,7 @@ drawVerticalLabels model =
                     (\rowIndex tip ->
                         (Svg.text_
                             [ x <| toString <| coord.cellX + model.grid.cellSize / 2.0
-                            , y <| toString <| coord.cellY - model.grid.cellSize * (toFloat rowIndex) - 6.0
+                            , y <| toString <| coord.cellY - model.grid.cellSize * (toFloat rowIndex) - model.grid.boldThickness - 2.0
                             ]
                             [ Svg.text <| toString tip ]
                         )
@@ -454,7 +454,7 @@ view model =
             [ Html.text "Bold thickness"
             , Html.input
                 [ Html.Attributes.type_ "range"
-                , Html.Attributes.min "1"
+                , Html.Attributes.min "0"
                 , Html.Attributes.max "10"
                 , Html.Attributes.value <| toString model.grid.boldThickness
                 , Html.Events.onInput BoldThicknessChanged
@@ -467,7 +467,7 @@ view model =
             [ Html.text "Thin thickness"
             , Html.input
                 [ Html.Attributes.type_ "range"
-                , Html.Attributes.min "1"
+                , Html.Attributes.min "0"
                 , Html.Attributes.max "10"
                 , Html.Attributes.value <| toString model.grid.thinThickness
                 , Html.Events.onInput ThinThicknessChanged

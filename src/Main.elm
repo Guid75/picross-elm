@@ -77,7 +77,7 @@ init =
         , thinThickness = 1.0
         , strokeColor = gridColor
         , cellSize = 20.0
-        , topLeft = { x = 200.0, y = 50.0 }
+        , topLeft = { x = 200.0, y = 100.0 }
         }
     , hoveredCell = Nothing
     , selection = Nothing
@@ -298,7 +298,7 @@ drawVerticalLabels model =
                             [ Svg.text <| toString tip ]
                         )
                     )
-                    tips
+                    (List.reverse tips)
     in
         [ g
             [ textAnchor "middle"

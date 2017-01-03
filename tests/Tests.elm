@@ -5,7 +5,7 @@ import Expect
 import Fuzz exposing (list, int, tuple, string)
 import Matrix exposing (Matrix)
 import Types exposing (Level)
-import Level
+import MatrixUtils
 
 
 all : Test
@@ -61,18 +61,18 @@ squareSet =
             ]
             |> Maybe.withDefault Matrix.empty
     , horizontalTips =
-        [ []
+        [ [ 0 ]
         , [ 3 ]
         , [ 3 ]
         , [ 3 ]
-        , []
+        , [ 0 ]
         ]
     , verticalTips =
-        [ []
+        [ [ 0 ]
         , [ 3 ]
         , [ 3 ]
         , [ 3 ]
-        , []
+        , [ 0 ]
         ]
     }
 
@@ -91,9 +91,9 @@ upperSet =
     , horizontalTips =
         [ [ 5 ]
         , [ 5 ]
-        , []
-        , []
-        , []
+        , [ 0 ]
+        , [ 0 ]
+        , [ 0 ]
         ]
     , verticalTips =
         [ [ 2 ]
@@ -112,34 +112,34 @@ levelTests =
             [ test "Cross" <|
                 \() ->
                     Expect.equal
-                        (Level.getHorizontalTips crossSet.matrix)
+                        (MatrixUtils.getHorizontalTips crossSet.matrix)
                         crossSet.horizontalTips
             , test "Square" <|
                 \() ->
                     Expect.equal
-                        (Level.getHorizontalTips squareSet.matrix)
+                        (MatrixUtils.getHorizontalTips squareSet.matrix)
                         squareSet.horizontalTips
             , test "Upper" <|
                 \() ->
                     Expect.equal
-                        (Level.getHorizontalTips upperSet.matrix)
+                        (MatrixUtils.getHorizontalTips upperSet.matrix)
                         upperSet.horizontalTips
             ]
         , describe "getVerticalTips"
             [ test "Cross" <|
                 \() ->
                     Expect.equal
-                        (Level.getVerticalTips crossSet.matrix)
+                        (MatrixUtils.getVerticalTips crossSet.matrix)
                         crossSet.verticalTips
             , test "Square" <|
                 \() ->
                     Expect.equal
-                        (Level.getVerticalTips squareSet.matrix)
+                        (MatrixUtils.getVerticalTips squareSet.matrix)
                         squareSet.verticalTips
             , test "Upper" <|
                 \() ->
                     Expect.equal
-                        (Level.getVerticalTips upperSet.matrix)
+                        (MatrixUtils.getVerticalTips upperSet.matrix)
                         upperSet.verticalTips
             ]
         ]

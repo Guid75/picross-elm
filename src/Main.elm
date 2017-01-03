@@ -15,6 +15,7 @@ import Mouse
 import Grid exposing (Grid)
 import Types exposing (Coord, CellType(..), Cell, CellSelection, Level)
 import Level
+import MatrixUtils
 
 
 main : Program Never Model Msg
@@ -249,7 +250,7 @@ drawHorizontalLabels model =
             toString <| model.grid.topLeft.x - 2.0
 
         allTips =
-            Level.getHorizontalTips <| Matrix.map .value model.board
+            MatrixUtils.getHorizontalTips <| Matrix.map .value model.board
 
         getTipsLine : Int -> List Int -> Svg Msg
         getTipsLine index tips =
@@ -281,7 +282,7 @@ drawVerticalLabels model =
             toString <| model.grid.topLeft.y - 2.0
 
         allTips =
-            Level.getVerticalTips <| Matrix.map .value model.board
+            MatrixUtils.getVerticalTips <| Matrix.map .value model.board
 
         getTipsCol : Int -> List Int -> List (Svg Msg)
         getTipsCol index tips =

@@ -1,4 +1,13 @@
-module Grid exposing (Grid, drawGrid, getCellCoord, getCellByXY, FloatCoord)
+module Grid
+    exposing
+        ( Grid
+        , drawGrid
+        , getCellCoord
+        , getCellByXY
+        , FloatCoord
+        , getGridHeight
+        , getGridWidth
+        )
 
 import Svg exposing (Svg, line)
 import Svg.Attributes exposing (..)

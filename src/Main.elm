@@ -357,6 +357,31 @@ drawSelection model =
                 |> List.map (drawRect model)
 
 
+drawWinningLabel : Model -> List (Svg Msg)
+drawWinningLabel model =
+    let
+        gridWidth =
+            Grid.getGridWidth model.grid
+
+        gridHeight =
+            Grid.getGridHeight model.grid
+    in
+        case isWinning model of
+            True ->
+                [ text_
+                    [ x <| toString <| model.grid.topLeft.x + gridWidth / 2.0
+                    , y <| toString <| model.grid.topLeft.y + gridHeight + model.grid.cellSize
+                    , textAnchor "middle"
+                    , fontSize <| (toString <| model.grid.cellSize) ++ "px"
+                    , fill "red"
+                    ]
+                    [ Svg.text "You win!" ]
+                ]
+
+            False ->
+                []
+
+
 viewSvg : Model -> Html Msg
 viewSvg model =
     svg
@@ -374,6 +399,7 @@ viewSvg model =
             , drawCells model
             , drawSelection model
             , drawHovered model
+            , drawWinningLabel model
             ]
 
 
@@ -590,6 +616,16 @@ choseLevel levelName model =
                 |> Maybe.andThen (\model -> Just { model | currentLevel = Just levelName })
     in
         Maybe.withDefault model maybeModel
+
+
+isWinning : Model -> Bool
+isWinning model =
+    let
+        isWrongCell cell =
+            (cell.value && cell.userChoice /= Selected)
+                || (not cell.value && cell.userChoice == Selected)
+    in
+        Array.isEmpty <| Matrix.filter isWrongCell model.board
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )

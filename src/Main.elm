@@ -274,6 +274,40 @@ drawHorizontalLabels model =
         ]
 
 
+drawVerticalLabels : Model -> List (Svg Msg)
+drawVerticalLabels model =
+    let
+        textBottom =
+            toString <| model.grid.topLeft.y - 2.0
+
+        allTips =
+            Level.getVerticalTips <| Matrix.map .value model.board
+
+        getTipsCol : Int -> List Int -> List (Svg Msg)
+        getTipsCol index tips =
+            let
+                coord =
+                    Grid.getCellCoord index 0 model.grid
+            in
+                List.indexedMap
+                    (\rowIndex tip ->
+                        (Svg.text_
+                            [ x <| toString <| coord.cellX + model.grid.cellSize / 2.0
+                            , y <| toString <| coord.cellY - model.grid.cellSize * (toFloat rowIndex) - 6.0
+                            ]
+                            [ Svg.text <| toString tip ]
+                        )
+                    )
+                    tips
+    in
+        [ g
+            [ textAnchor "middle"
+            , fontSize <| (toString <| model.grid.cellSize) ++ "px"
+            ]
+            (List.concat (List.indexedMap getTipsCol allTips))
+        ]
+
+
 selectionToRectangle : CellSelection -> ( Coord, Coord )
 selectionToRectangle selection =
     let
@@ -335,6 +369,7 @@ viewSvg model =
         List.concat
             [ [ g [] <| Grid.drawGrid model.grid ]
             , drawHorizontalLabels model
+            , drawVerticalLabels model
             , drawCells model
             , drawSelection model
             , drawHovered model

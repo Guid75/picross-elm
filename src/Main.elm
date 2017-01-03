@@ -6,6 +6,7 @@ import Html.Events
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
+import Svg.Lazy exposing (lazy)
 import Json.Decode exposing (int, string, list, Decoder)
 import Json.Decode.Pipeline exposing (decode, required, optional)
 import List.Extra
@@ -222,17 +223,21 @@ drawCell model { col, row } cell opacity =
             Grid.getCellCoord col row model.grid
     in
         g
-            []
-            (case cell.userChoice of
-                Selected ->
-                    drawSelected cellPos model.grid.cellSize opacity
+            [ Svg.Attributes.class "cell" ]
+        <|
+            List.concat
+                [ (case cell.userChoice of
+                    Selected ->
+                        drawSelected cellPos model.grid.cellSize opacity
 
-                Rejected ->
-                    drawRejected cellPos model.grid.cellSize opacity
+                    Rejected ->
+                        drawRejected cellPos model.grid.cellSize opacity
 
-                _ ->
-                    []
-            )
+                    _ ->
+                        []
+                  )
+                , []
+                ]
 
 
 drawCells : Model -> List (Svg Msg)
@@ -394,7 +399,23 @@ viewSvg model =
         ]
     <|
         List.concat
-            [ [ g [] <| Grid.drawGrid model.grid ]
+            [ case isWinning model of
+                True ->
+                    [ Svg.animate
+                        [ xlinkHref "#toto"
+                        , attributeName "opacity"
+                        , attributeType "CSS"
+                        , from "1"
+                        , to "0"
+                        , dur "3s"
+                        , repeatCount "indefinite"
+                        ]
+                        []
+                    ]
+
+                False ->
+                    []
+            , [ lazy Grid.drawGrid model.grid ]
             , drawHorizontalLabels model
             , drawVerticalLabels model
             , drawCells model

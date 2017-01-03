@@ -9,7 +9,7 @@ module Grid
         , getGridWidth
         )
 
-import Svg exposing (Svg, line)
+import Svg exposing (Svg, line, g)
 import Svg.Attributes exposing (..)
 
 
@@ -119,12 +119,15 @@ getGridHeight grid =
         offset + thickness / 2.0
 
 
-drawGrid : Grid -> List (Svg msg)
+drawGrid : Grid -> Svg msg
 drawGrid grid =
-    List.concat
-        [ (List.foldl (drawVerticalLine grid) [] (List.range 0 grid.colCount))
-        , (List.foldl (drawHorizontalLine grid) [] (List.range 0 grid.rowCount))
-        ]
+    g
+        [ id "toto" ]
+        (List.concat
+            [ (List.foldl (drawVerticalLine grid) [] (List.range 0 grid.colCount))
+            , (List.foldl (drawHorizontalLine grid) [] (List.range 0 grid.rowCount))
+            ]
+        )
 
 
 getCellCoord : Int -> Int -> Grid -> { cellX : Float, cellY : Float }

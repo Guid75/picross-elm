@@ -1,6 +1,6 @@
 port module Picross exposing (..)
 
-import Html exposing (select, option, text, div, Html, input)
+import Html exposing (select, option, text, div, Html, input, button)
 import Html.Attributes
 import Html.Events
 import Svg exposing (..)
@@ -38,6 +38,7 @@ type Msg
     | ThinThicknessChanged String
     | CellSizeChanged String
     | GetLevels (Result Http.Error (List Level))
+    | Cheat
     | ChoseLevel String
 
 
@@ -448,7 +449,12 @@ view model =
         , viewSvg model
         , div
             []
-            [ Html.text "Levels ", levelsCombo model ]
+            [ Html.text "Levels "
+            , levelsCombo model
+            , button
+                [ onClick Cheat ]
+                [ Html.text "resolve it! (cheat)" ]
+            ]
         , div
             []
             [ Html.text "Bold thickness"
@@ -628,6 +634,19 @@ isWinning model =
         Array.isEmpty <| Matrix.filter isWrongCell model.board
 
 
+cheat : Model -> Model
+cheat model =
+    let
+        resolve : Cell -> Cell
+        resolve cell =
+            if cell.value then
+                { cell | userChoice = Selected }
+            else
+                { cell | userChoice = Empty }
+    in
+        { model | board = Matrix.map resolve model.board }
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
@@ -690,6 +709,9 @@ update msg model =
 
         ChoseLevel level ->
             choseLevel level model ! []
+
+        Cheat ->
+            cheat model ! []
 
         NoOp ->
             model ! []

@@ -8,13 +8,13 @@ import Svg.Attributes exposing (..)
 import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
 import Json.Decode exposing (int, string, list, Decoder)
 import Json.Decode.Pipeline exposing (decode, required, optional)
+import List.Extra
 import Matrix exposing (Matrix)
 import Http
 import Array
 import Mouse
 import Grid exposing (Grid)
 import Types exposing (Coord, CellType(..), Cell, CellSelection, Level)
-import Level
 import MatrixUtils
 
 
@@ -574,12 +574,17 @@ applyBoolBoard model board =
         }
 
 
+getLevelByName : String -> List Level -> Maybe Level
+getLevelByName name levels =
+    List.Extra.find (.name >> (==) name) levels
+
+
 choseLevel : String -> Model -> Model
 choseLevel levelName model =
     let
         maybeModel =
             model.levels
-                |> Maybe.andThen (Level.getLevelByName levelName)
+                |> Maybe.andThen (getLevelByName levelName)
                 |> Maybe.andThen (\level -> Matrix.fromList level.content)
                 |> Maybe.andThen (\board -> Just <| applyBoolBoard model board)
                 |> Maybe.andThen (\model -> Just { model | currentLevel = Just levelName })

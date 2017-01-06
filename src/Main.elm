@@ -12,8 +12,10 @@ import Json.Decode.Pipeline exposing (decode, required, optional)
 import List.Extra
 import Matrix exposing (Matrix)
 import Http
+import Time exposing (second)
 import Array
 import Mouse
+import Animation
 import Grid exposing (Grid)
 import Types exposing (Coord, CellType(..), Cell, CellSelection, Level)
 import MatrixUtils
@@ -24,7 +26,7 @@ main =
     Html.program
         { init = init
         , view = view
-        , update = update
+        , update = winningUpdateWrapper update
         , subscriptions = subscriptions
         }
 
@@ -41,6 +43,7 @@ type Msg
     | GetLevels (Result Http.Error (List Level))
     | Cheat
     | ChoseLevel String
+    | Animate Animation.Msg
 
 
 type alias Model =
@@ -50,6 +53,7 @@ type alias Model =
     , selection : Maybe CellSelection
     , levels : Maybe (List Level)
     , currentLevel : Maybe String
+    , style : Animation.State
     }
 
 
@@ -86,6 +90,9 @@ init =
     , selection = Nothing
     , levels = Nothing
     , currentLevel = Nothing
+    , style =
+        Animation.style
+            [ Animation.opacity 1.0 ]
     }
         ! [ getLevels ]
 
@@ -221,9 +228,15 @@ drawCell model { col, row } cell opacity =
     let
         cellPos =
             Grid.getCellCoord col row model.grid
+
+        attrs =
+            if cell.userChoice == Rejected then
+                Animation.render model.style
+            else
+                []
     in
         g
-            [ Svg.Attributes.class "cell" ]
+            (attrs ++ [ Svg.Attributes.class "cell" ])
         <|
             List.concat
                 [ (case cell.userChoice of
@@ -399,23 +412,7 @@ viewSvg model =
         ]
     <|
         List.concat
-            [ case isWinning model of
-                True ->
-                    [ Svg.animate
-                        [ xlinkHref "#toto"
-                        , attributeName "opacity"
-                        , attributeType "CSS"
-                        , from "1"
-                        , to "0"
-                        , dur "3s"
-                        , repeatCount "indefinite"
-                        ]
-                        []
-                    ]
-
-                False ->
-                    []
-            , [ lazy Grid.drawGrid model.grid ]
+            [ [ lazy Grid.drawGrid model.grid ]
             , drawHorizontalLabels model
             , drawVerticalLabels model
             , drawCells model
@@ -663,9 +660,39 @@ cheat model =
             if cell.value then
                 { cell | userChoice = Selected }
             else
-                { cell | userChoice = Empty }
+                { cell | userChoice = Rejected }
     in
         { model | board = Matrix.map resolve model.board }
+
+
+winningUpdateWrapper : (Msg -> Model -> ( Model, Cmd Msg )) -> Msg -> Model -> ( Model, Cmd Msg )
+winningUpdateWrapper updateFunc msg model =
+    let
+        oldWinning =
+            isWinning model
+
+        ( newModel, cmd ) =
+            updateFunc msg model
+    in
+        if isWinning newModel && not oldWinning then
+            ( { newModel
+                | style =
+                    Animation.interrupt
+                        [ Animation.toWith
+                            (Animation.easing
+                                { duration = 1 * second
+                                , ease = (\x -> x)
+                                }
+                            )
+                            [ Animation.opacity 0
+                            ]
+                        ]
+                        (Debug.log "style" model.style)
+              }
+            , cmd
+            )
+        else
+            ( newModel, cmd )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -729,10 +756,26 @@ update msg model =
             model ! []
 
         ChoseLevel level ->
-            choseLevel level model ! []
+            let
+                newModel =
+                    choseLevel level model
+            in
+                { newModel
+                    | style =
+                        Animation.style
+                            [ Animation.opacity 1.0
+                            ]
+                }
+                    ! []
 
         Cheat ->
             cheat model ! []
+
+        Animate animMsg ->
+            { model
+                | style = Animation.update animMsg model.style
+            }
+                ! []
 
         NoOp ->
             model ! []
@@ -757,4 +800,5 @@ subscriptions model =
         , boardMousePosResult BoardMousePos
         , boardMouseDown BoardMouseDown
         , boardMouseUp BoardMouseUp
+        , Animation.subscription Animate [ model.style ]
         ]

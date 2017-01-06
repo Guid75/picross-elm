@@ -52,7 +52,7 @@ type alias Model =
     , selection : Maybe CellSelection
     , levels : Maybe (List Level)
     , currentLevel : Maybe String
-    , style : Animation.State
+    , fadeOutAnim : Animation.State
     }
 
 
@@ -89,7 +89,7 @@ init =
     , selection = Nothing
     , levels = Nothing
     , currentLevel = Nothing
-    , style =
+    , fadeOutAnim =
         Animation.style
             [ Animation.opacity 1.0 ]
     }
@@ -230,7 +230,7 @@ drawCell model { col, row } cell opacity =
 
         attrs =
             if cell.userChoice == Rejected then
-                Animation.render model.style
+                Animation.render model.fadeOutAnim
             else
                 []
     in
@@ -265,7 +265,7 @@ drawHorizontalLabels : Model -> List (Svg Msg)
 drawHorizontalLabels model =
     let
         animAttrs =
-            Animation.render model.style
+            Animation.render model.fadeOutAnim
 
         textRight =
             toString <| model.grid.topLeft.x - 2.0
@@ -302,7 +302,7 @@ drawVerticalLabels : Model -> List (Svg Msg)
 drawVerticalLabels model =
     let
         animAttrs =
-            Animation.render model.style
+            Animation.render model.fadeOutAnim
 
         textBottom =
             toString <| model.grid.topLeft.y - 2.0
@@ -414,7 +414,7 @@ viewSvg : Model -> Html Msg
 viewSvg model =
     let
         animAttrs =
-            Animation.render model.style
+            Animation.render model.fadeOutAnim
     in
         svg
             [ id "board"
@@ -702,7 +702,7 @@ winningUpdateWrapper updateFunc msg model =
     in
         if isWinning newModel && not oldWinning then
             ( { newModel
-                | style =
+                | fadeOutAnim =
                     Animation.interrupt
                         [ Animation.toWith
                             (Animation.easing
@@ -713,7 +713,7 @@ winningUpdateWrapper updateFunc msg model =
                             [ Animation.opacity 0
                             ]
                         ]
-                        model.style
+                        model.fadeOutAnim
               }
             , cmd
             )
@@ -787,7 +787,7 @@ update msg model =
                     choseLevel level model
             in
                 { newModel
-                    | style =
+                    | fadeOutAnim =
                         Animation.style
                             [ Animation.opacity 1.0
                             ]
@@ -799,7 +799,7 @@ update msg model =
 
         Animate animMsg ->
             { model
-                | style = Animation.update animMsg model.style
+                | fadeOutAnim = Animation.update animMsg model.fadeOutAnim
             }
                 ! []
 
@@ -826,5 +826,5 @@ subscriptions model =
         , boardMousePosResult BoardMousePos
         , boardMouseDown BoardMouseDown
         , boardMouseUp BoardMouseUp
-        , Animation.subscription Animate [ model.style ]
+        , Animation.subscription Animate [ model.fadeOutAnim ]
         ]

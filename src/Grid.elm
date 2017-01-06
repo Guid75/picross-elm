@@ -9,6 +9,7 @@ module Grid
         , getGridWidth
         )
 
+import Html
 import Svg exposing (Svg, line, g)
 import Svg.Attributes exposing (..)
 
@@ -119,10 +120,10 @@ getGridHeight grid =
         offset + thickness / 2.0
 
 
-drawGrid : Grid -> Svg msg
-drawGrid grid =
+drawGrid : Grid -> List (Html.Attribute msg) -> Svg msg
+drawGrid grid animAttrs =
     g
-        [ id "toto" ]
+        animAttrs
         (List.concat
             [ (List.foldl (drawVerticalLine grid) [] (List.range 0 grid.colCount))
             , (List.foldl (drawHorizontalLine grid) [] (List.range 0 grid.rowCount))

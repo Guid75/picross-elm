@@ -6,7 +6,6 @@ import Html.Events
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
 import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
-import Svg.Lazy exposing (lazy)
 import Json.Decode exposing (int, string, list, Decoder)
 import Json.Decode.Pipeline exposing (decode, required, optional)
 import List.Extra
@@ -236,7 +235,7 @@ drawCell model { col, row } cell opacity =
                 []
     in
         g
-            (attrs ++ [ Svg.Attributes.class "cell" ])
+            attrs
         <|
             List.concat
                 [ (case cell.userChoice of
@@ -265,6 +264,9 @@ drawCells model =
 drawHorizontalLabels : Model -> List (Svg Msg)
 drawHorizontalLabels model =
     let
+        animAttrs =
+            Animation.render model.style
+
         textRight =
             toString <| model.grid.topLeft.x - 2.0
 
@@ -287,9 +289,11 @@ drawHorizontalLabels model =
                     ]
     in
         [ g
-            [ textAnchor "end"
-            , fontSize <| (toString <| model.grid.cellSize) ++ "px"
-            ]
+            (animAttrs
+                ++ [ textAnchor "end"
+                   , fontSize <| (toString <| model.grid.cellSize) ++ "px"
+                   ]
+            )
             (List.indexedMap getTipsLine allTips)
         ]
 
@@ -297,6 +301,9 @@ drawHorizontalLabels model =
 drawVerticalLabels : Model -> List (Svg Msg)
 drawVerticalLabels model =
     let
+        animAttrs =
+            Animation.render model.style
+
         textBottom =
             toString <| model.grid.topLeft.y - 2.0
 
@@ -321,9 +328,11 @@ drawVerticalLabels model =
                     (List.reverse tips)
     in
         [ g
-            [ textAnchor "middle"
-            , fontSize <| (toString <| model.grid.cellSize) ++ "px"
-            ]
+            (animAttrs
+                ++ [ textAnchor "middle"
+                   , fontSize <| (toString <| model.grid.cellSize) ++ "px"
+                   ]
+            )
             (List.concat (List.indexedMap getTipsCol allTips))
         ]
 
@@ -403,23 +412,32 @@ drawWinningLabel model =
 
 viewSvg : Model -> Html Msg
 viewSvg model =
-    svg
-        [ id "board"
-        , width "1024"
-        , height "500"
-        , viewBox "0 0 1024 500"
-          --        , shapeRendering "crispEdges"
-        ]
-    <|
-        List.concat
-            [ [ lazy Grid.drawGrid model.grid ]
-            , drawHorizontalLabels model
-            , drawVerticalLabels model
-            , drawCells model
-            , drawSelection model
-            , drawHovered model
-            , drawWinningLabel model
+    let
+        animAttrs =
+            Animation.render model.style
+    in
+        svg
+            [ id "board"
+            , width "1024"
+            , height "500"
+            , viewBox "0 0 1024 500"
+              --        , shapeRendering "crispEdges"
             ]
+        <|
+            List.concat
+                [ [ Grid.drawGrid model.grid animAttrs ]
+                , drawHorizontalLabels model
+                , drawVerticalLabels model
+                , drawCells model
+                , drawSelection model
+                , case isWinning model of
+                    True ->
+                        []
+
+                    False ->
+                        drawHovered model
+                , drawWinningLabel model
+                ]
 
 
 levelsDecoder : Decoder Msg
@@ -532,7 +550,10 @@ mouseDownOnGrid model =
         coordToSelection coord =
             { firstCell = coord, lastCell = coord }
     in
-        { model | selection = Maybe.map coordToSelection model.hoveredCell }
+        if isWinning model then
+            model
+        else
+            { model | selection = Maybe.map coordToSelection model.hoveredCell }
 
 
 updateBoardWithSelection : Model -> CellType -> Matrix Cell
@@ -572,22 +593,27 @@ updateBoardWithSelection model cellType =
 
 mouseUpOnGrid : Int -> Model -> Model
 mouseUpOnGrid button model =
-    let
-        value =
-            case button of
-                1 ->
-                    Selected
+    case isWinning model of
+        True ->
+            model
 
-                _ ->
-                    Rejected
+        False ->
+            let
+                value =
+                    case button of
+                        1 ->
+                            Selected
 
-        board =
-            updateBoardWithSelection model value
-    in
-        { model
-            | selection = Nothing
-            , board = board
-        }
+                        _ ->
+                            Rejected
+
+                board =
+                    updateBoardWithSelection model value
+            in
+                { model
+                    | selection = Nothing
+                    , board = board
+                }
 
 
 boardMousePos : ( Float, Float ) -> Model -> Model
@@ -687,7 +713,7 @@ winningUpdateWrapper updateFunc msg model =
                             [ Animation.opacity 0
                             ]
                         ]
-                        (Debug.log "style" model.style)
+                        model.style
               }
             , cmd
             )

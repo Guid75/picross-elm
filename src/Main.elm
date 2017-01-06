@@ -1,7 +1,7 @@
 port module Picross exposing (..)
 
 import Html exposing (select, option, text, div, Html, input, button)
-import Html.Attributes
+import Html.Attributes exposing (disabled)
 import Html.Events
 import Svg exposing (..)
 import Svg.Attributes exposing (..)
@@ -36,9 +36,6 @@ type Msg
     | BoardMouseDown Int
     | BoardMouseUp Int
     | BoardMousePos ( Float, Float )
-    | BoldThicknessChanged String
-    | ThinThicknessChanged String
-    | CellSizeChanged String
     | GetLevels (Result Http.Error (List Level))
     | Cheat
     | ChoseLevel String
@@ -477,58 +474,19 @@ view : Model -> Html Msg
 view model =
     div
         []
-        [ div
-            []
-            [ Html.text "Left button to select cells, "
-            , Html.text "Right button to reject cells"
-            ]
-        , viewSvg model
+        [ viewSvg model
         , div
             []
             [ Html.text "Levels "
             , levelsCombo model
             , button
-                [ onClick Cheat ]
+                [ onClick Cheat
+                , disabled <| isWinning model
+                ]
                 [ Html.text "resolve it! (cheat)" ]
-            ]
-        , div
-            []
-            [ Html.text "Bold thickness"
-            , Html.input
-                [ Html.Attributes.type_ "range"
-                , Html.Attributes.min "0"
-                , Html.Attributes.max "10"
-                , Html.Attributes.value <| toString model.grid.boldThickness
-                , Html.Events.onInput BoldThicknessChanged
-                ]
-                []
-            , Html.text <| toString model.grid.boldThickness
-            ]
-        , div
-            []
-            [ Html.text "Thin thickness"
-            , Html.input
-                [ Html.Attributes.type_ "range"
-                , Html.Attributes.min "0"
-                , Html.Attributes.max "10"
-                , Html.Attributes.value <| toString model.grid.thinThickness
-                , Html.Events.onInput ThinThicknessChanged
-                ]
-                []
-            , Html.text <| toString model.grid.thinThickness
-            ]
-        , div
-            []
-            [ Html.text "Cell size"
-            , Html.input
-                [ Html.Attributes.type_ "range"
-                , Html.Attributes.min "1"
-                , Html.Attributes.max "40"
-                , Html.Attributes.value <| toString model.grid.cellSize
-                , Html.Events.onInput CellSizeChanged
-                ]
-                []
-            , Html.text <| toString model.grid.cellSize
+            , button
+                [ onClick (ChoseLevel <| Maybe.withDefault "1" model.currentLevel) ]
+                [ Html.text "restart it!" ]
             ]
         ]
 
@@ -732,36 +690,6 @@ update msg model =
 
         MouseMove pos ->
             ( model, requestBoardMousePos ( pos.x, pos.y ) )
-
-        BoldThicknessChanged value ->
-            let
-                grid =
-                    model.grid
-
-                newGrid =
-                    { grid | boldThickness = Result.withDefault 2.0 (String.toFloat value) }
-            in
-                { model | grid = newGrid } ! []
-
-        ThinThicknessChanged value ->
-            let
-                grid =
-                    model.grid
-
-                newGrid =
-                    { grid | thinThickness = Result.withDefault 2.0 (String.toFloat value) }
-            in
-                { model | grid = newGrid } ! []
-
-        CellSizeChanged value ->
-            let
-                grid =
-                    model.grid
-
-                newGrid =
-                    { grid | cellSize = Result.withDefault 2.0 (String.toFloat value) }
-            in
-                { model | grid = newGrid } ! []
 
         BoardMousePos pos ->
             boardMousePos pos model ! []

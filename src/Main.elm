@@ -42,8 +42,14 @@ type Msg
     | Animate Animation.Msg
 
 
+type State
+    = Playing
+    | Won
+
+
 type alias Model =
     { board : Matrix Cell
+    , state : State
     , grid : Grid
     , hoveredCell : Maybe Coord
     , selection : Maybe CellSelection
@@ -72,6 +78,7 @@ init : ( Model, Cmd Msg )
 init =
     { board =
         Matrix.repeat 17 20 (Cell Empty False)
+    , state = Playing
     , grid =
         { colCount = 17
         , rowCount = 20
@@ -219,11 +226,22 @@ drawRejected { cellX, cellY } cellSize opacity =
         ]
 
 
+getCellPos : Int -> Int -> Model -> { cellX : Float, cellY : Float }
+getCellPos col row model =
+    -- case isWinning model of
+    --     True ->
+    --         { cellX = model.grid.topLeft.x + model.grid.cellSize * (toFloat col)
+    --         , cellY = model.grid.topLeft.y + model.grid.cellSize * (toFloat row)
+    --         }
+    --     False ->
+    Grid.getCellCoord col row model.grid
+
+
 drawCell : Model -> Coord -> Cell -> Float -> Svg Msg
 drawCell model { col, row } cell opacity =
     let
         cellPos =
-            Grid.getCellCoord col row model.grid
+            getCellPos col row model
 
         attrs =
             if cell.userChoice == Rejected then
@@ -523,12 +541,18 @@ updateBoardWithSelection model cellType =
             else
                 cellType
 
+        overrideValue cellValue value =
+            if cellValue == Selected && value == Rejected then
+                Selected
+            else
+                value
+
         setCell value { col, row } board =
             Matrix.update
                 col
                 row
                 (\cell ->
-                    { cell | userChoice = value }
+                    { cell | userChoice = overrideValue cell.userChoice value }
                 )
                 board
     in
@@ -621,19 +645,38 @@ choseLevel levelName model =
                 |> Maybe.andThen (getLevelByName levelName)
                 |> Maybe.andThen (\level -> Matrix.fromList level.content)
                 |> Maybe.andThen (\board -> Just <| applyBoolBoard model board)
-                |> Maybe.andThen (\model -> Just { model | currentLevel = Just levelName })
+                |> Maybe.andThen (\model -> Just { model | currentLevel = Just levelName, state = Playing })
     in
         Maybe.withDefault model maybeModel
 
 
+checkWinning : Model -> Model
+checkWinning model =
+    case model.state of
+        Won ->
+            model
+
+        Playing ->
+            let
+                isWrongCell cell =
+                    (cell.value && cell.userChoice /= Selected)
+                        || (not cell.value && cell.userChoice == Selected)
+
+                won =
+                    Array.isEmpty <| Matrix.filter isWrongCell model.board
+            in
+                { model
+                    | state =
+                        if won then
+                            Won
+                        else
+                            model.state
+                }
+
+
 isWinning : Model -> Bool
 isWinning model =
-    let
-        isWrongCell cell =
-            (cell.value && cell.userChoice /= Selected)
-                || (not cell.value && cell.userChoice == Selected)
-    in
-        Array.isEmpty <| Matrix.filter isWrongCell model.board
+    model.state == Won
 
 
 cheat : Model -> Model
@@ -655,8 +698,11 @@ winningUpdateWrapper updateFunc msg model =
         oldWinning =
             isWinning model
 
-        ( newModel, cmd ) =
+        ( updateModel, cmd ) =
             updateFunc msg model
+
+        newModel =
+            checkWinning updateModel
     in
         if isWinning newModel && not oldWinning then
             ( { newModel

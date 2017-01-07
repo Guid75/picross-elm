@@ -79,7 +79,7 @@ init =
         , boldThickness = 3.0
         , thinThickness = 1.0
         , strokeColor = gridColor
-        , cellSize = 20.0
+        , cellSize = 15.0
         , topLeft = { x = 200.0, y = 100.0 }
         }
     , hoveredCell = Nothing
@@ -415,9 +415,9 @@ viewSvg model =
     in
         svg
             [ id "board"
-            , width "1024"
-            , height "500"
-            , viewBox "0 0 1024 500"
+            , width "1200"
+            , height "600"
+            , viewBox "0 0 1200 600"
               --        , shapeRendering "crispEdges"
             ]
         <|

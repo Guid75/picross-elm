@@ -562,12 +562,12 @@ viewSvg model =
                 , drawVerticalLabels model
                 , drawCells model
                 , drawSelection model
-                , case isWinning model of
-                    True ->
-                        []
-
-                    False ->
+                , case ( isWinning model, model.selection ) of
+                    ( False, Nothing ) ->
                         drawHovered model
+
+                    _ ->
+                        []
                 , drawWinningLabel model
                 , drawOverRect model
                 ]

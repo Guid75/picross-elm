@@ -274,6 +274,62 @@ drawCells model =
         |> Array.toList
 
 
+drawHorizontalLabelsHover : Model -> List (Svg Msg)
+drawHorizontalLabelsHover model =
+    case ( model.hoveredCell, model.state ) of
+        ( Just { row }, Playing ) ->
+            [ rect
+                [ x <| toString <| model.boundingBox.x
+                , y <| toString <| (Grid.getCellCoord 0 row model.grid).cellY
+                , height <| toString <| model.grid.cellSize
+                , width <| toString <| -model.boundingBox.x
+                , fill "black"
+                ]
+                []
+            ]
+
+        _ ->
+            []
+
+
+drawVerticalLabelsHover : Model -> List (Svg Msg)
+drawVerticalLabelsHover model =
+    case ( model.hoveredCell, model.state ) of
+        ( Just { col }, Playing ) ->
+            [ rect
+                [ x <| toString <| (Grid.getCellCoord col 0 model.grid).cellX
+                , y <| toString <| model.boundingBox.y
+                , height <| toString <| -model.boundingBox.y
+                , width <| toString <| model.grid.cellSize
+                , fill "black"
+                ]
+                []
+            ]
+
+        _ ->
+            []
+
+
+isHoveredRow : Model -> Int -> Bool
+isHoveredRow model testRow =
+    case model.hoveredCell of
+        Just { row } ->
+            testRow == row
+
+        Nothing ->
+            False
+
+
+isHoveredCol : Model -> Int -> Bool
+isHoveredCol model testCol =
+    case model.hoveredCell of
+        Just { col } ->
+            testCol == col
+
+        Nothing ->
+            False
+
+
 drawHorizontalLabels : Model -> List (Svg Msg)
 drawHorizontalLabels model =
     let
@@ -293,22 +349,33 @@ drawHorizontalLabels model =
                     List.map toString tips |> String.join " "
             in
                 Svg.text_
-                    [ x textRight
-                    , y <| toString <| (Grid.getCellCoord 0 index model.grid).cellY + model.grid.cellSize / 2.0
+                    [ y <| toString <| (Grid.getCellCoord 0 index model.grid).cellY + model.grid.cellSize / 2.0
+                    , fill <|
+                        if isHoveredRow model index then
+                            "white"
+                        else
+                            "black"
                     ]
                     [ tspan
                         [ dominantBaseline "central" ]
                         [ Svg.text text ]
                     ]
+
+        bbox =
+            model.boundingBox
     in
-        [ g
-            (animAttrs
-                ++ [ textAnchor "end"
-                   , fontSize <| (toString <| model.grid.cellSize) ++ "px"
-                   ]
-            )
-            (List.indexedMap getTipsLine allTips)
-        ]
+        List.append
+            (drawHorizontalLabelsHover model)
+            [ g
+                (animAttrs
+                    ++ [ textAnchor "end"
+                       , fontSize <| (toString <| model.grid.cellSize) ++ "px"
+                       , x textRight
+                       , fill "white"
+                       ]
+                )
+                (List.indexedMap getTipsLine allTips)
+            ]
 
 
 drawVerticalLabels : Model -> List (Svg Msg)
@@ -334,20 +401,27 @@ drawVerticalLabels model =
                         (Svg.text_
                             [ x <| toString <| coord.cellX + model.grid.cellSize / 2.0
                             , y <| toString <| coord.cellY - model.grid.cellSize * (toFloat rowIndex) - model.grid.boldThickness - 2.0
+                            , fill <|
+                                if isHoveredCol model index then
+                                    "white"
+                                else
+                                    "black"
                             ]
                             [ Svg.text <| toString tip ]
                         )
                     )
                     (List.reverse tips)
     in
-        [ g
-            (animAttrs
-                ++ [ textAnchor "middle"
-                   , fontSize <| (toString <| model.grid.cellSize) ++ "px"
-                   ]
-            )
-            (List.concat (List.indexedMap getTipsCol allTips))
-        ]
+        List.append
+            (drawVerticalLabelsHover model)
+            [ g
+                (animAttrs
+                    ++ [ textAnchor "middle"
+                       , fontSize <| (toString <| model.grid.cellSize) ++ "px"
+                       ]
+                )
+                (List.concat (List.indexedMap getTipsCol allTips))
+            ]
 
 
 selectionToRectangle : CellSelection -> ( Coord, Coord )

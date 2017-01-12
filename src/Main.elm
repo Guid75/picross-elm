@@ -40,6 +40,7 @@ type Msg
     | ChoseLevel String
     | Animate Animation.Msg
     | SvgMouseMove Coord
+    | SvgMouseLeave
     | TransMousePosResult ( Float, Float )
 
 
@@ -450,6 +451,7 @@ drawOverRect model =
             , strokeWidth "0.0"
             , opacity "0.0"
             , Svg.Events.on "mousemove" (Json.Decode.map SvgMouseMove mouseEvent)
+            , Svg.Events.on "mouseleave" (Json.Decode.succeed SvgMouseLeave)
             ]
             []
         ]
@@ -468,9 +470,6 @@ viewSvg model =
             [ id "board"
             , width "1200"
             , height "600"
-              -- , viewBox "-200 -100 1200 500"
-              -- , viewBox "-57.25 -66 492.25 357"
-              -- , viewBox "-18.35 -26.30 93.35 101.30"
             , viewBox <|
                 (toString bbox.x)
                     ++ " "
@@ -479,9 +478,7 @@ viewSvg model =
                     ++ (toString bbox.width)
                     ++ " "
                     ++ (toString bbox.height)
-              --            , viewBox "-119 -130.64 1202 853.64"
             , preserveAspectRatio "xMinYMin meet"
-              --            , width "100%"
               --        , shapeRendering "crispEdges"
             ]
         <|
@@ -791,7 +788,7 @@ update msg model =
             in
                 case newModel.levels |> Maybe.andThen List.head of
                     Just level ->
-                        choseLevel level.name newModel ! []
+                        choseLevel level.name newModel ! [ computeBoardSize () ]
 
                     Nothing ->
                         newModel ! []
@@ -826,6 +823,10 @@ update msg model =
 
         SvgMouseMove coord ->
             model ! [ requestTransMousePos ( coord.col, coord.row ) ]
+
+        SvgMouseLeave ->
+            { model | hoveredCell = Nothing }
+                ! []
 
         TransMousePosResult pos ->
             boardMousePos pos model ! []

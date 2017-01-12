@@ -4,15 +4,15 @@ module Grid
         , drawGrid
         , getCellCoord
         , getCellByXY
-        , FloatCoord
         , getGridHeight
         , getGridWidth
+        , getGridTopLeft
         )
 
 import Html
 import Svg exposing (Svg, line, g)
 import Svg.Attributes exposing (..)
-
+import Types exposing (FloatCoord)
 
 type alias Grid =
     { colCount : Int
@@ -23,12 +23,6 @@ type alias Grid =
     , cellSize : Float
     , topLeft : FloatCoord
     , strokeColor : String
-    }
-
-
-type alias FloatCoord =
-    { x : Float
-    , y : Float
     }
 
 
@@ -118,6 +112,17 @@ getGridHeight grid =
             getThicknessByIndex grid lastLineIndex
     in
         offset + thickness / 2.0
+
+
+getGridTopLeft : Grid -> FloatCoord
+getGridTopLeft grid =
+    let
+        offset =
+            getNthLineOffset grid 0
+    in
+        { x = offset
+        , y = offset
+        }
 
 
 drawGrid : Grid -> List (Html.Attribute msg) -> Svg msg

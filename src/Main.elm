@@ -13,10 +13,9 @@ import Matrix exposing (Matrix)
 import Http
 import Time exposing (second)
 import Array
-import Mouse
 import Animation
 import Grid exposing (Grid)
-import Types exposing (Coord, CellType(..), Cell, CellSelection, Level)
+import Types exposing (Coord, FloatCoord, CellType(..), Cell, CellSelection, Level)
 import MatrixUtils
 
 
@@ -32,14 +31,16 @@ main =
 
 type Msg
     = NoOp
-    | MouseMove { x : Int, y : Int }
     | BoardMouseDown Int
     | BoardMouseUp Int
     | BoardMousePos ( Float, Float )
+    | BoardSizeResult ( Float, Float, Float, Float )
     | GetLevels (Result Http.Error (List Level))
     | Cheat
     | ChoseLevel String
     | Animate Animation.Msg
+    | SvgMouseMove Coord
+    | TransMousePosResult ( Float, Float )
 
 
 type State
@@ -56,6 +57,7 @@ type alias Model =
     , levels : Maybe (List Level)
     , currentLevel : Maybe String
     , fadeOutAnim : Animation.State
+    , boundingBox : { x : Float, y : Float, width : Float, height : Float }
     }
 
 
@@ -86,8 +88,8 @@ init =
         , boldThickness = 3.0
         , thinThickness = 1.0
         , strokeColor = gridColor
-        , cellSize = 15.0
-        , topLeft = { x = 200.0, y = 100.0 }
+        , cellSize = 20.0
+        , topLeft = { x = 0.0, y = 0.0 }
         }
     , hoveredCell = Nothing
     , selection = Nothing
@@ -96,6 +98,7 @@ init =
     , fadeOutAnim =
         Animation.style
             [ Animation.opacity 1.0 ]
+    , boundingBox = { x = 0.0, y = 0.0, width = 0.0, height = 0.0 }
     }
         ! [ getLevels ]
 
@@ -228,12 +231,6 @@ drawRejected { cellX, cellY } cellSize opacity =
 
 getCellPos : Int -> Int -> Model -> { cellX : Float, cellY : Float }
 getCellPos col row model =
-    -- case isWinning model of
-    --     True ->
-    --         { cellX = model.grid.topLeft.x + model.grid.cellSize * (toFloat col)
-    --         , cellY = model.grid.topLeft.y + model.grid.cellSize * (toFloat row)
-    --         }
-    --     False ->
     Grid.getCellCoord col row model.grid
 
 
@@ -425,17 +422,66 @@ drawWinningLabel model =
                 []
 
 
+mouseEvent : Decoder Coord
+mouseEvent =
+    decode Coord
+        |> required "clientX" Json.Decode.int
+        |> required "clientY" Json.Decode.int
+
+
+drawOverRect : Model -> List (Svg Msg)
+drawOverRect model =
+    let
+        gridTopLeft =
+            Grid.getGridTopLeft model.grid
+
+        gridHeight =
+            Grid.getGridHeight model.grid
+
+        gridWidth =
+            Grid.getGridWidth model.grid
+    in
+        [ rect
+            [ x <| toString <| model.grid.topLeft.x
+            , y <| toString <| model.grid.topLeft.y
+            , width <| toString <| gridWidth
+            , height <| toString <| gridHeight
+            , fill "red"
+            , strokeWidth "0.0"
+            , opacity "0.0"
+            , Svg.Events.on "mousemove" (Json.Decode.map SvgMouseMove mouseEvent)
+            ]
+            []
+        ]
+
+
 viewSvg : Model -> Html Msg
 viewSvg model =
     let
         animAttrs =
             Animation.render model.fadeOutAnim
+
+        bbox =
+            model.boundingBox
     in
         svg
             [ id "board"
             , width "1200"
             , height "600"
-            , viewBox "0 0 1200 600"
+              -- , viewBox "-200 -100 1200 500"
+              -- , viewBox "-57.25 -66 492.25 357"
+              -- , viewBox "-18.35 -26.30 93.35 101.30"
+            , viewBox <|
+                (toString bbox.x)
+                    ++ " "
+                    ++ (toString bbox.y)
+                    ++ " "
+                    ++ (toString bbox.width)
+                    ++ " "
+                    ++ (toString bbox.height)
+              --            , viewBox "-119 -130.64 1202 853.64"
+            , preserveAspectRatio "xMinYMin meet"
+              --            , width "100%"
               --        , shapeRendering "crispEdges"
             ]
         <|
@@ -452,6 +498,7 @@ viewSvg model =
                     False ->
                         drawHovered model
                 , drawWinningLabel model
+                , drawOverRect model
                 ]
 
 
@@ -734,9 +781,6 @@ update msg model =
         BoardMouseUp button ->
             mouseUpOnGrid button model ! []
 
-        MouseMove pos ->
-            ( model, requestBoardMousePos ( pos.x, pos.y ) )
-
         BoardMousePos pos ->
             boardMousePos pos model ! []
 
@@ -766,7 +810,7 @@ update msg model =
                             [ Animation.opacity 1.0
                             ]
                 }
-                    ! []
+                    ! [ computeBoardSize () ]
 
         Cheat ->
             cheat model ! []
@@ -776,6 +820,15 @@ update msg model =
                 | fadeOutAnim = Animation.update animMsg model.fadeOutAnim
             }
                 ! []
+
+        BoardSizeResult ( x, y, width, height ) ->
+            { model | boundingBox = { x = x, y = y, width = width, height = height } } ! []
+
+        SvgMouseMove coord ->
+            model ! [ requestTransMousePos ( coord.col, coord.row ) ]
+
+        TransMousePosResult pos ->
+            boardMousePos pos model ! []
 
         NoOp ->
             model ! []
@@ -787,18 +840,31 @@ port boardMousePosResult : (( Float, Float ) -> msg) -> Sub msg
 port requestBoardMousePos : ( Int, Int ) -> Cmd msg
 
 
+port computeBoardSize : () -> Cmd msg
+
+
+port computeBoardSizeResult : (( Float, Float, Float, Float ) -> msg) -> Sub msg
+
+
 port boardMouseDown : (Int -> msg) -> Sub msg
 
 
 port boardMouseUp : (Int -> msg) -> Sub msg
 
 
+port requestTransMousePos : ( Int, Int ) -> Cmd msg
+
+
+port transMousePosResult : (( Float, Float ) -> msg) -> Sub msg
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ Mouse.moves MouseMove
-        , boardMousePosResult BoardMousePos
+        [ boardMousePosResult BoardMousePos
+        , computeBoardSizeResult BoardSizeResult
         , boardMouseDown BoardMouseDown
         , boardMouseUp BoardMouseUp
         , Animation.subscription Animate [ model.fadeOutAnim ]
+        , transMousePosResult TransMousePosResult
         ]

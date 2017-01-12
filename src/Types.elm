@@ -1,6 +1,7 @@
 module Types
     exposing
         ( Coord
+        , FloatCoord
         , CellType(..)
         , Cell
         , CellSelection
@@ -11,6 +12,12 @@ module Types
 type alias Coord =
     { col : Int
     , row : Int
+    }
+
+
+type alias FloatCoord =
+    { x : Float
+    , y : Float
     }
 
 

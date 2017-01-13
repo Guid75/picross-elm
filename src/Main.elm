@@ -720,13 +720,15 @@ boardMousePos : ( Float, Float ) -> Model -> Model
 boardMousePos ( x, y ) model =
     let
         hoveredCell =
-            Grid.getCellByXY x y model.grid
+            --Grid.getCellByXY x y model.grid
+            Grid.getClosestCell { x = x, y = y } model.grid
 
         selection =
-            Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = Maybe.withDefault selection.lastCell hoveredCell }) model.selection
+            --            Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = Maybe.withDefault selection.lastCell hoveredCell }) model.selection
+            Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = hoveredCell }) model.selection
     in
         { model
-            | hoveredCell = hoveredCell
+            | hoveredCell = Just hoveredCell
             , selection = selection
         }
 

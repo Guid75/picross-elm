@@ -3,16 +3,16 @@ module Grid
         ( Grid
         , drawGrid
         , getCellCoord
-        , getCellByXY
         , getGridHeight
         , getGridWidth
         , getGridTopLeft
+        , getClosestCell
         )
 
 import Html
 import Svg exposing (Svg, line, g)
 import Svg.Attributes exposing (..)
-import Types exposing (FloatCoord)
+import Types exposing (FloatCoord, GridCoord)
 
 
 type alias Grid =
@@ -151,56 +151,52 @@ getCellCoord col row grid =
         }
 
 
-getColByX : Float -> Grid -> Maybe Int
-getColByX x grid =
+getClosestRow : Float -> Grid -> Int
+getClosestRow y grid =
     let
-        getCol : Int -> Maybe Int
-        getCol col =
-            let
-                coord =
-                    getCellCoord col 0 grid
-            in
-                if col >= grid.colCount then
-                    Nothing
-                else if x >= coord.x && x <= coord.x + grid.cellSize then
-                    Just col
-                else
-                    getCol <| col + 1
-    in
-        getCol 0
-
-
-getRowByY : Float -> Grid -> Maybe Int
-getRowByY y grid =
-    let
-        getRow : Int -> Maybe Int
+        getRow : Int -> Int
         getRow row =
             let
-                coord =
-                    getCellCoord 0 row grid
+                upperHalfThickness =
+                    (getThicknessByIndex grid (row + 1)) / 2.0
+
+                upperCoord =
+                    getCellCoord 0 (row + 1) grid
             in
                 if row >= grid.rowCount then
-                    Nothing
-                else if y >= coord.y && y <= coord.y + grid.cellSize then
-                    Just row
+                    grid.rowCount - 1
+                else if y < upperCoord.y - upperHalfThickness then
+                    row
                 else
                     getRow <| row + 1
     in
         getRow 0
 
 
-getCellByXY : Float -> Float -> Grid -> Maybe { col : Int, row : Int }
-getCellByXY x y grid =
+getClosedCol : Float -> Grid -> Int
+getClosedCol x grid =
     let
-        maybeCol =
-            getColByX x grid
+        getCol : Int -> Int
+        getCol col =
+            let
+                rightHalfThickness =
+                    (getThicknessByIndex grid (col + 1)) / 2.0
 
-        maybeRow =
-            getRowByY y grid
+                rightCoord =
+                    getCellCoord (col + 1) 0 grid
+            in
+                if col >= grid.colCount then
+                    grid.colCount - 1
+                else if x < rightCoord.x - rightHalfThickness then
+                    col
+                else
+                    getCol <| col + 1
     in
-        case ( maybeCol, maybeRow ) of
-            ( Just col, Just row ) ->
-                Just { col = col, row = row }
+        getCol 0
 
-            _ ->
-                Nothing
+
+getClosestCell : FloatCoord -> Grid -> GridCoord
+getClosestCell { x, y } grid =
+    { col = getClosestRow x grid
+    , row = getClosestRow y grid
+    }

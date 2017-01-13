@@ -14,6 +14,7 @@ import Svg exposing (Svg, line, g)
 import Svg.Attributes exposing (..)
 import Types exposing (FloatCoord)
 
+
 type alias Grid =
     { colCount : Int
     , rowCount : Int
@@ -136,7 +137,7 @@ drawGrid grid animAttrs =
         )
 
 
-getCellCoord : Int -> Int -> Grid -> { cellX : Float, cellY : Float }
+getCellCoord : Int -> Int -> Grid -> FloatCoord
 getCellCoord col row grid =
     let
         colThickness =
@@ -145,8 +146,8 @@ getCellCoord col row grid =
         rowThickness =
             getThicknessByIndex grid row
     in
-        { cellX = (getNthLineOffset grid col) + colThickness / 2.0 + grid.topLeft.x
-        , cellY = (getNthLineOffset grid row) + rowThickness / 2.0 + grid.topLeft.y
+        { x = (getNthLineOffset grid col) + colThickness / 2.0 + grid.topLeft.x
+        , y = (getNthLineOffset grid row) + rowThickness / 2.0 + grid.topLeft.y
         }
 
 
@@ -161,7 +162,7 @@ getColByX x grid =
             in
                 if col >= grid.colCount then
                     Nothing
-                else if x >= coord.cellX && x <= coord.cellX + grid.cellSize then
+                else if x >= coord.x && x <= coord.x + grid.cellSize then
                     Just col
                 else
                     getCol <| col + 1
@@ -180,7 +181,7 @@ getRowByY y grid =
             in
                 if row >= grid.rowCount then
                     Nothing
-                else if y >= coord.cellY && y <= coord.cellY + grid.cellSize then
+                else if y >= coord.y && y <= coord.y + grid.cellSize then
                     Just row
                 else
                     getRow <| row + 1

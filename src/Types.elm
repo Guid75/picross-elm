@@ -1,7 +1,8 @@
 module Types
     exposing
-        ( Coord
+        ( GridCoord
         , FloatCoord
+        , Coord
         , CellType(..)
         , Cell
         , CellSelection
@@ -10,6 +11,12 @@ module Types
 
 
 type alias Coord =
+    { x : Int
+    , y : Int
+    }
+
+
+type alias GridCoord =
     { col : Int
     , row : Int
     }
@@ -34,8 +41,8 @@ type alias Cell =
 
 
 type alias CellSelection =
-    { firstCell : Coord
-    , lastCell : Coord
+    { firstCell : GridCoord
+    , lastCell : GridCoord
     }
 
 

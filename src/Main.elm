@@ -15,7 +15,7 @@ import Time exposing (second)
 import Array
 import Animation
 import Grid exposing (Grid)
-import Types exposing (Coord, FloatCoord, CellType(..), Cell, CellSelection, Level)
+import Types exposing (GridCoord, FloatCoord, Coord, CellType(..), Cell, CellSelection, Level)
 import MatrixUtils
 
 
@@ -33,7 +33,6 @@ type Msg
     = NoOp
     | BoardMouseDown Int
     | BoardMouseUp Int
-    | BoardMousePos ( Float, Float )
     | BoardSizeResult ( Float, Float, Float, Float )
     | GetLevels (Result Http.Error (List Level))
     | Cheat
@@ -53,7 +52,7 @@ type alias Model =
     { board : Matrix Cell
     , state : State
     , grid : Grid
-    , hoveredCell : Maybe Coord
+    , hoveredCell : Maybe GridCoord
     , selection : Maybe CellSelection
     , levels : Maybe (List Level)
     , currentLevel : Maybe String
@@ -134,15 +133,15 @@ getLevels =
         Http.send GetLevels request
 
 
-drawRect : Model -> Coord -> Svg Msg
+drawRect : Model -> GridCoord -> Svg Msg
 drawRect model { col, row } =
     let
-        { cellX, cellY } =
+        cellCoord =
             Grid.getCellCoord col row model.grid
     in
         rect
-            [ x <| toString <| cellX + 1.0
-            , y <| toString <| cellY + 1.0
+            [ x <| toString <| cellCoord.x + 1.0
+            , y <| toString <| cellCoord.y + 1.0
             , width <| toString <| model.grid.cellSize - 2.0
             , height <| toString <| model.grid.cellSize - 2.0
             , fill "red"
@@ -158,12 +157,12 @@ drawHovered model =
 
         Just { col, row } ->
             let
-                { cellX, cellY } =
+                cellCoord =
                     Grid.getCellCoord col row model.grid
             in
                 [ rect
-                    [ x <| toString <| cellX
-                    , y <| toString <| cellY
+                    [ x <| toString <| cellCoord.x
+                    , y <| toString <| cellCoord.y
                     , width <| toString <| model.grid.cellSize
                     , height <| toString <| model.grid.cellSize
                     , fill "blue"
@@ -172,8 +171,8 @@ drawHovered model =
                 ]
 
 
-drawSelected : { cellX : Float, cellY : Float } -> Float -> Float -> List (Svg Msg)
-drawSelected { cellX, cellY } cellSize opacity =
+drawSelected : FloatCoord -> Float -> Float -> List (Svg Msg)
+drawSelected cellCoord cellSize opacity =
     let
         padding =
             1.0
@@ -182,8 +181,8 @@ drawSelected { cellX, cellY } cellSize opacity =
             "#383838"
     in
         [ rect
-            [ x <| toString <| cellX + padding
-            , y <| toString <| cellY + padding
+            [ x <| toString <| cellCoord.x + padding
+            , y <| toString <| cellCoord.y + padding
             , width <| toString <| cellSize - 2.0 * padding
             , height <| toString <| cellSize - 2.0 * padding
             , fill color
@@ -193,8 +192,8 @@ drawSelected { cellX, cellY } cellSize opacity =
         ]
 
 
-drawRejected : { cellX : Float, cellY : Float } -> Float -> Float -> List (Svg Msg)
-drawRejected { cellX, cellY } cellSize opacity =
+drawRejected : FloatCoord -> Float -> Float -> List (Svg Msg)
+drawRejected cellCoord cellSize opacity =
     let
         padding =
             4.0
@@ -206,10 +205,10 @@ drawRejected { cellX, cellY } cellSize opacity =
             "4.0"
     in
         [ line
-            [ x1 <| toString <| cellX + padding
-            , y1 <| toString <| cellY + padding
-            , x2 <| toString <| cellX + cellSize - padding
-            , y2 <| toString <| cellY + cellSize - padding
+            [ x1 <| toString <| cellCoord.x + padding
+            , y1 <| toString <| cellCoord.y + padding
+            , x2 <| toString <| cellCoord.x + cellSize - padding
+            , y2 <| toString <| cellCoord.y + cellSize - padding
             , stroke color
             , strokeWidth width
             , strokeOpacity <| toString opacity
@@ -217,10 +216,10 @@ drawRejected { cellX, cellY } cellSize opacity =
             ]
             []
         , line
-            [ x1 <| toString <| cellX + padding
-            , y1 <| toString <| cellY + cellSize - padding
-            , x2 <| toString <| cellX + cellSize - padding
-            , y2 <| toString <| cellY + padding
+            [ x1 <| toString <| cellCoord.x + padding
+            , y1 <| toString <| cellCoord.y + cellSize - padding
+            , x2 <| toString <| cellCoord.x + cellSize - padding
+            , y2 <| toString <| cellCoord.y + padding
             , stroke color
             , strokeWidth width
             , strokeOpacity <| toString opacity
@@ -230,16 +229,11 @@ drawRejected { cellX, cellY } cellSize opacity =
         ]
 
 
-getCellPos : Int -> Int -> Model -> { cellX : Float, cellY : Float }
-getCellPos col row model =
-    Grid.getCellCoord col row model.grid
-
-
-drawCell : Model -> Coord -> Cell -> Float -> Svg Msg
+drawCell : Model -> GridCoord -> Cell -> Float -> Svg Msg
 drawCell model { col, row } cell opacity =
     let
         cellPos =
-            getCellPos col row model
+            Grid.getCellCoord col row model.grid
 
         attrs =
             if cell.userChoice == Rejected then
@@ -280,7 +274,7 @@ drawHorizontalLabelsHover model =
         ( Just { row }, Playing ) ->
             [ rect
                 [ x <| toString <| model.boundingBox.x
-                , y <| toString <| (Grid.getCellCoord 0 row model.grid).cellY
+                , y <| toString <| .y <| Grid.getCellCoord 0 row model.grid
                 , height <| toString <| model.grid.cellSize
                 , width <| toString <| -model.boundingBox.x
                 , fill "black"
@@ -297,7 +291,7 @@ drawVerticalLabelsHover model =
     case ( model.hoveredCell, model.state ) of
         ( Just { col }, Playing ) ->
             [ rect
-                [ x <| toString <| (Grid.getCellCoord col 0 model.grid).cellX
+                [ x <| toString <| .x <| Grid.getCellCoord col 0 model.grid
                 , y <| toString <| model.boundingBox.y
                 , height <| toString <| -model.boundingBox.y
                 , width <| toString <| model.grid.cellSize
@@ -347,9 +341,12 @@ drawHorizontalLabels model =
             let
                 text =
                     List.map toString tips |> String.join " "
+
+                cellCoord =
+                    Grid.getCellCoord 0 index model.grid
             in
                 Svg.text_
-                    [ y <| toString <| (Grid.getCellCoord 0 index model.grid).cellY + model.grid.cellSize / 2.0
+                    [ y <| toString <| cellCoord.y + model.grid.cellSize / 2.0
                     , fill <|
                         if isHoveredRow model index then
                             "white"
@@ -393,14 +390,14 @@ drawVerticalLabels model =
         getTipsCol : Int -> List Int -> List (Svg Msg)
         getTipsCol index tips =
             let
-                coord =
+                cellCoord =
                     Grid.getCellCoord index 0 model.grid
             in
                 List.indexedMap
                     (\rowIndex tip ->
                         (Svg.text_
-                            [ x <| toString <| coord.cellX + model.grid.cellSize / 2.0
-                            , y <| toString <| coord.cellY - model.grid.cellSize * (toFloat rowIndex) - model.grid.boldThickness - 2.0
+                            [ x <| toString <| cellCoord.x + model.grid.cellSize / 2.0
+                            , y <| toString <| cellCoord.y - model.grid.cellSize * (toFloat rowIndex) - model.grid.boldThickness - 2.0
                             , fill <|
                                 if isHoveredCol model index then
                                     "white"
@@ -424,7 +421,7 @@ drawVerticalLabels model =
             ]
 
 
-selectionToRectangle : CellSelection -> ( Coord, Coord )
+selectionToRectangle : CellSelection -> ( GridCoord, GridCoord )
 selectionToRectangle selection =
     let
         ( col1, col2 ) =
@@ -442,7 +439,7 @@ selectionToRectangle selection =
         ( { col = col1, row = row1 }, { col = col2, row = row2 } )
 
 
-selectionToList : CellSelection -> List Coord
+selectionToList : CellSelection -> List GridCoord
 selectionToList selection =
     let
         ( topLeft, bottomRight ) =
@@ -504,8 +501,11 @@ mouseEvent =
         |> required "clientY" Json.Decode.int
 
 
-drawOverRect : Model -> List (Svg Msg)
-drawOverRect model =
+{-| Draw the transparent rectangle that will be used to intercept all mouse
+   events relative to the grid
+-}
+drawGridMouseLayer : Model -> List (Svg Msg)
+drawGridMouseLayer model =
     let
         gridTopLeft =
             Grid.getGridTopLeft model.grid
@@ -569,7 +569,7 @@ viewSvg model =
                     _ ->
                         []
                 , drawWinningLabel model
-                , drawOverRect model
+                , drawGridMouseLayer model
                 ]
 
 
@@ -627,7 +627,7 @@ view model =
         ]
 
 
-toggleCell : Model -> Coord -> Model
+toggleCell : Model -> GridCoord -> Model
 toggleCell model { col, row } =
     case Matrix.get col row model.board of
         Just cell ->
@@ -640,7 +640,7 @@ toggleCell model { col, row } =
 mouseDownOnGrid : Model -> Model
 mouseDownOnGrid model =
     let
-        coordToSelection : Coord -> CellSelection
+        coordToSelection : GridCoord -> CellSelection
         coordToSelection coord =
             { firstCell = coord, lastCell = coord }
     in
@@ -852,9 +852,6 @@ update msg model =
         BoardMouseUp button ->
             mouseUpOnGrid button model ! []
 
-        BoardMousePos pos ->
-            boardMousePos pos model ! []
-
         GetLevels (Ok levels) ->
             let
                 newModel =
@@ -896,7 +893,7 @@ update msg model =
             { model | boundingBox = { x = x, y = y, width = width, height = height } } ! []
 
         SvgMouseMove coord ->
-            model ! [ requestTransMousePos ( coord.col, coord.row ) ]
+            model ! [ requestTransMousePos ( coord.x, coord.y ) ]
 
         SvgMouseLeave ->
             { model | hoveredCell = Nothing }
@@ -907,12 +904,6 @@ update msg model =
 
         NoOp ->
             model ! []
-
-
-port boardMousePosResult : (( Float, Float ) -> msg) -> Sub msg
-
-
-port requestBoardMousePos : ( Int, Int ) -> Cmd msg
 
 
 port computeBoardSize : () -> Cmd msg
@@ -936,8 +927,7 @@ port transMousePosResult : (( Float, Float ) -> msg) -> Sub msg
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
-        [ boardMousePosResult BoardMousePos
-        , computeBoardSizeResult BoardSizeResult
+        [ computeBoardSizeResult BoardSizeResult
         , boardMouseDown BoardMouseDown
         , boardMouseUp BoardMouseUp
         , Animation.subscription Animate [ model.fadeOutAnim ]

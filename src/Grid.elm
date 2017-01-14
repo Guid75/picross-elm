@@ -173,8 +173,8 @@ getClosestRow y grid =
         getRow 0
 
 
-getClosedCol : Float -> Grid -> Int
-getClosedCol x grid =
+getClosestCol : Float -> Grid -> Int
+getClosestCol x grid =
     let
         getCol : Int -> Int
         getCol col =
@@ -197,6 +197,6 @@ getClosedCol x grid =
 
 getClosestCell : FloatCoord -> Grid -> GridCoord
 getClosestCell { x, y } grid =
-    { col = getClosestRow x grid
+    { col = getClosestCol x grid
     , row = getClosestRow y grid
     }

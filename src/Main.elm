@@ -44,7 +44,8 @@ type Msg
 
 
 type State
-    = Playing
+    = Init
+    | Playing
     | Won
 
 
@@ -80,7 +81,7 @@ init : ( Model, Cmd Msg )
 init =
     { board =
         Matrix.repeat 17 20 (Cell Empty False)
-    , state = Playing
+    , state = Init
     , grid =
         { colCount = 17
         , rowCount = 20
@@ -540,37 +541,47 @@ viewSvg model =
         bbox =
             model.boundingBox
     in
-        svg
-            [ id "board"
-            , width "1200"
-            , height "600"
-            , viewBox <|
-                (toString bbox.x)
-                    ++ " "
-                    ++ (toString bbox.y)
-                    ++ " "
-                    ++ (toString bbox.width)
-                    ++ " "
-                    ++ (toString bbox.height)
-            , preserveAspectRatio "xMinYMin meet"
-              --        , shapeRendering "crispEdges"
-            ]
-        <|
-            List.concat
-                [ [ Grid.drawGrid model.grid animAttrs ]
-                , drawHorizontalLabels model
-                , drawVerticalLabels model
-                , drawCells model
-                , drawSelection model
-                , case ( isWinning model, model.selection ) of
-                    ( False, Nothing ) ->
-                        drawHovered model
+        case model.state of
+            Init ->
+                svg
+                    [ id "board"
+                    , width "800"
+                    , height "600"
+                    ]
+                    []
 
-                    _ ->
-                        []
-                , drawWinningLabel model
-                , drawGridMouseLayer model
-                ]
+            _ ->
+                svg
+                    [ id "board"
+                    , width "800"
+                    , height "600"
+                    , viewBox <|
+                        (toString bbox.x)
+                            ++ " "
+                            ++ (toString bbox.y)
+                            ++ " "
+                            ++ (toString bbox.width)
+                            ++ " "
+                            ++ (toString bbox.height)
+                    , preserveAspectRatio "xMinYMin meet"
+                      --        , shapeRendering "crispEdges"
+                    ]
+                <|
+                    List.concat
+                        [ [ Grid.drawGrid model.grid animAttrs ]
+                        , drawHorizontalLabels model
+                        , drawVerticalLabels model
+                        , drawCells model
+                        , drawSelection model
+                        , case ( isWinning model, model.selection ) of
+                            ( False, Nothing ) ->
+                                drawHovered model
+
+                            _ ->
+                                []
+                        , drawWinningLabel model
+                        , drawGridMouseLayer model
+                        ]
 
 
 levelsDecoder : Decoder Msg
@@ -720,11 +731,9 @@ boardMousePos : ( Float, Float ) -> Model -> Model
 boardMousePos ( x, y ) model =
     let
         hoveredCell =
-            --Grid.getCellByXY x y model.grid
             Grid.getClosestCell { x = x, y = y } model.grid
 
         selection =
-            --            Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = Maybe.withDefault selection.lastCell hoveredCell }) model.selection
             Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = hoveredCell }) model.selection
     in
         { model
@@ -773,9 +782,6 @@ choseLevel levelName model =
 checkWinning : Model -> Model
 checkWinning model =
     case model.state of
-        Won ->
-            model
-
         Playing ->
             let
                 isWrongCell cell =
@@ -792,6 +798,9 @@ checkWinning model =
                         else
                             model.state
                 }
+
+        _ ->
+            model
 
 
 isWinning : Model -> Bool

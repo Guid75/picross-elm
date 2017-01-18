@@ -1,3 +1,3 @@
-A simple picross clone written in Elm
+A nonogram game written in Elm
 
 Test the work in progress here : https://guid75.github.io/picross-elm/

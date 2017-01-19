@@ -9,11 +9,14 @@ import Svg.Events exposing (onClick, onMouseDown, onMouseUp, onMouseMove)
 import Json.Decode exposing (int, string, list, Decoder)
 import Json.Decode.Pipeline exposing (decode, required, optional)
 import List.Extra
+import Dict exposing (Dict)
 import Matrix exposing (Matrix)
 import Http
 import Time exposing (second)
 import Array
 import Animation
+import Animation.Messenger
+import Ease
 import Grid exposing (Grid)
 import Types exposing (GridCoord, FloatCoord, Coord, CellType(..), Cell, CellSelection, Level)
 import MatrixUtils
@@ -41,12 +44,28 @@ type Msg
     | SvgMouseMove Coord
     | SvgMouseLeave
     | TransMousePosResult ( Float, Float )
+    | EndOfFade
 
 
 type State
     = Init
     | Playing
-    | Won
+    | Won AnimState
+
+
+type AnimState
+    = WonAnimFadeOut (Animation.Messenger.State Msg)
+    | WonAnimShrinking ShrinkAnims
+
+
+type alias ShrinkAnims =
+    Dict ( Int, Int ) ShrinkAnim
+
+
+type alias ShrinkAnim =
+    { anim : Animation.Messenger.State Msg
+    , finished : Bool
+    }
 
 
 type alias Model =
@@ -57,7 +76,6 @@ type alias Model =
     , selection : Maybe CellSelection
     , levels : Maybe (List Level)
     , currentLevel : Maybe String
-    , fadeOutAnim : Animation.State
     , boundingBox : { x : Float, y : Float, width : Float, height : Float }
     }
 
@@ -95,10 +113,8 @@ init =
     , hoveredCell = Nothing
     , selection = Nothing
     , levels = Nothing
-    , currentLevel = Nothing
-    , fadeOutAnim =
-        Animation.style
-            [ Animation.opacity 1.0 ]
+    , currentLevel =
+        Nothing
     , boundingBox = { x = 0.0, y = 0.0, width = 0.0, height = 0.0 }
     }
         ! [ getLevels ]
@@ -172,30 +188,66 @@ drawHovered model =
                 ]
 
 
-drawSelected : FloatCoord -> Float -> Float -> List (Svg Msg)
-drawSelected cellCoord cellSize opacity =
+drawSelected : Model -> GridCoord -> Svg Msg
+drawSelected model { col, row } =
     let
+        cellCoord =
+            Grid.getCellCoord col row model.grid
+
+        cellSize =
+            model.grid.cellSize
+
         padding =
             1.0
 
         color =
             "#383838"
+
+        attrs =
+            case model.state of
+                Won (WonAnimShrinking shrinkAnims) ->
+                    case Dict.get ( col, row ) shrinkAnims of
+                        Just shrinkAnim ->
+                            Animation.render shrinkAnim.anim
+
+                        Nothing ->
+                            []
+
+                _ ->
+                    []
+
+        pos =
+            case attrs of
+                [] ->
+                    [ x <| toString <| cellCoord.x + padding
+                    , y <| toString <| cellCoord.y + padding
+                    ]
+
+                _ ->
+                    attrs
     in
-        [ rect
-            [ x <| toString <| cellCoord.x + padding
-            , y <| toString <| cellCoord.y + padding
-            , width <| toString <| cellSize - 2.0 * padding
-            , height <| toString <| cellSize - 2.0 * padding
-            , fill color
-            , fillOpacity <| toString opacity
-            ]
+        rect
+            (List.concat
+                [ pos
+                , [ width <| toString <| cellSize - 2.0 * padding
+                  , height <| toString <| cellSize - 2.0 * padding
+                  , fill color
+                    --                  , fillOpacity <| toString opacity
+                  ]
+                ]
+            )
             []
-        ]
 
 
-drawRejected : FloatCoord -> Float -> Float -> List (Svg Msg)
-drawRejected cellCoord cellSize opacity =
+drawRejected : Model -> GridCoord -> Svg Msg
+drawRejected model { col, row } =
     let
+        cellCoord =
+            Grid.getCellCoord col row model.grid
+
+        cellSize =
+            model.grid.cellSize
+
         padding =
             4.0
 
@@ -204,69 +256,67 @@ drawRejected cellCoord cellSize opacity =
 
         width =
             "4.0"
-    in
-        [ line
-            [ x1 <| toString <| cellCoord.x + padding
-            , y1 <| toString <| cellCoord.y + padding
-            , x2 <| toString <| cellCoord.x + cellSize - padding
-            , y2 <| toString <| cellCoord.y + cellSize - padding
-            , stroke color
-            , strokeWidth width
-            , strokeOpacity <| toString opacity
-            , strokeLinecap "round"
-            ]
-            []
-        , line
-            [ x1 <| toString <| cellCoord.x + padding
-            , y1 <| toString <| cellCoord.y + cellSize - padding
-            , x2 <| toString <| cellCoord.x + cellSize - padding
-            , y2 <| toString <| cellCoord.y + padding
-            , stroke color
-            , strokeWidth width
-            , strokeOpacity <| toString opacity
-            , strokeLinecap "round"
-            ]
-            []
-        ]
-
-
-drawCell : Model -> GridCoord -> Cell -> Float -> Svg Msg
-drawCell model { col, row } cell opacity =
-    let
-        cellPos =
-            Grid.getCellCoord col row model.grid
 
         attrs =
-            if cell.userChoice == Rejected then
-                Animation.render model.fadeOutAnim
-            else
-                []
+            getFadeOutAnimAttrs model
     in
         g
             attrs
-        <|
-            List.concat
-                [ (case cell.userChoice of
-                    Selected ->
-                        drawSelected cellPos model.grid.cellSize opacity
-
-                    Rejected ->
-                        drawRejected cellPos model.grid.cellSize opacity
-
-                    _ ->
-                        []
-                  )
-                , []
+            [ line
+                [ x1 <| toString <| cellCoord.x + padding
+                , y1 <| toString <| cellCoord.y + padding
+                , x2 <| toString <| cellCoord.x + cellSize - padding
+                , y2 <| toString <| cellCoord.y + cellSize - padding
+                , stroke color
+                , strokeWidth width
+                , strokeOpacity <| toString opacity
+                , strokeLinecap "round"
                 ]
+                []
+            , line
+                [ x1 <| toString <| cellCoord.x + padding
+                , y1 <| toString <| cellCoord.y + cellSize - padding
+                , x2 <| toString <| cellCoord.x + cellSize - padding
+                , y2 <| toString <| cellCoord.y + padding
+                , stroke color
+                , strokeWidth width
+                , strokeOpacity <| toString opacity
+                , strokeLinecap "round"
+                ]
+                []
+            ]
+
+
+drawCell : Model -> GridCoord -> Cell -> Maybe (Svg Msg)
+drawCell model gridCoord cell =
+    case cell.userChoice of
+        Selected ->
+            Just <| drawSelected model gridCoord
+
+        Rejected ->
+            Just <| drawRejected model gridCoord
+
+        _ ->
+            Nothing
 
 
 drawCells : Model -> List (Svg Msg)
 drawCells model =
-    model.board
-        |> Matrix.toIndexedArray
-        |> Array.filter (\( _, cell ) -> cell.userChoice /= Empty)
-        |> Array.map (\( ( col, row ), cell ) -> drawCell model { col = col, row = row } cell 1.0)
-        |> Array.toList
+    let
+        filterFunc =
+            case model.state of
+                Won (WonAnimShrinking _) ->
+                    \( _, cell ) -> cell.value
+
+                _ ->
+                    \( _, cell ) -> cell.userChoice /= Empty
+    in
+        model.board
+            |> Matrix.toIndexedArray
+            |> Array.filter filterFunc
+            |> Array.map (\( ( col, row ), cell ) -> drawCell model { col = col, row = row } cell)
+            |> Array.toList
+            |> List.filterMap identity
 
 
 drawHorizontalLabelsHover : Model -> List (Svg Msg)
@@ -329,7 +379,7 @@ drawHorizontalLabels : Model -> List (Svg Msg)
 drawHorizontalLabels model =
     let
         animAttrs =
-            Animation.render model.fadeOutAnim
+            getFadeOutAnimAttrs model
 
         textRight =
             toString <| model.grid.topLeft.x - 2.0
@@ -380,7 +430,7 @@ drawVerticalLabels : Model -> List (Svg Msg)
 drawVerticalLabels model =
     let
         animAttrs =
-            Animation.render model.fadeOutAnim
+            getFadeOutAnimAttrs model
 
         textBottom =
             toString <| model.grid.topLeft.y - 2.0
@@ -532,11 +582,21 @@ drawGridMouseLayer model =
         ]
 
 
+getFadeOutAnimAttrs : Model -> List (Attribute Msg)
+getFadeOutAnimAttrs model =
+    case model.state of
+        Won (WonAnimFadeOut fadeOutAnim) ->
+            Animation.render fadeOutAnim
+
+        _ ->
+            []
+
+
 viewSvg : Model -> Html Msg
 viewSvg model =
     let
         animAttrs =
-            Animation.render model.fadeOutAnim
+            getFadeOutAnimAttrs model
 
         bbox =
             model.boundingBox
@@ -564,13 +624,20 @@ viewSvg model =
                             ++ " "
                             ++ (toString bbox.height)
                     , preserveAspectRatio "xMinYMin meet"
-                      --        , shapeRendering "crispEdges"
+                      --, shapeRendering "crispEdges"
                     ]
                 <|
                     List.concat
-                        [ [ Grid.drawGrid model.grid animAttrs ]
-                        , drawHorizontalLabels model
-                        , drawVerticalLabels model
+                        [ case model.state of
+                            Won (WonAnimShrinking _) ->
+                                []
+
+                            _ ->
+                                List.concat
+                                    [ [ Grid.drawGrid model.grid animAttrs ]
+                                    , drawHorizontalLabels model
+                                    , drawVerticalLabels model
+                                    ]
                         , drawCells model
                         , drawSelection model
                         , case ( isWinning model, model.selection ) of
@@ -613,7 +680,8 @@ levelsCombo model =
                         levels
     in
         select
-            [ Html.Events.on "change" levelsDecoder ]
+            [ Html.Events.on "change" levelsDecoder
+            , Html.Attributes.value <| Maybe.withDefault "1" model.currentLevel ]
             options
 
 
@@ -779,6 +847,12 @@ choseLevel levelName model =
         Maybe.withDefault model maybeModel
 
 
+getFadeOutInitialStyle : Animation.Messenger.State Msg
+getFadeOutInitialStyle =
+    Animation.style
+        [ Animation.opacity 1.0 ]
+
+
 checkWinning : Model -> Model
 checkWinning model =
     case model.state of
@@ -794,7 +868,7 @@ checkWinning model =
                 { model
                     | state =
                         if won then
-                            Won
+                            Won <| WonAnimFadeOut getFadeOutInitialStyle
                         else
                             model.state
                 }
@@ -805,7 +879,12 @@ checkWinning model =
 
 isWinning : Model -> Bool
 isWinning model =
-    model.state == Won
+    case model.state of
+        Won _ ->
+            True
+
+        _ ->
+            False
 
 
 cheat : Model -> Model
@@ -835,23 +914,104 @@ winningUpdateWrapper updateFunc msg model =
     in
         if isWinning newModel && not oldWinning then
             ( { newModel
-                | fadeOutAnim =
+                | state =
                     Animation.interrupt
                         [ Animation.toWith
                             (Animation.easing
-                                { duration = 1 * second
+                                { duration = 0.6 * second
                                 , ease = (\x -> x)
                                 }
                             )
                             [ Animation.opacity 0
                             ]
+                        , Animation.Messenger.send EndOfFade
                         ]
-                        model.fadeOutAnim
+                        getFadeOutInitialStyle
+                        |> WonAnimFadeOut
+                        |> Won
               }
             , cmd
             )
         else
             ( newModel, cmd )
+
+
+getCellInitAnim : Model -> GridCoord -> Animation.Messenger.State Msg
+getCellInitAnim model { col, row } =
+    let
+        cellPos =
+            Grid.getCellCoord col row model.grid
+    in
+        Animation.style
+            [ Animation.x <| cellPos.x + 1.0
+            , Animation.y <| cellPos.y + 1.0
+            ]
+
+
+getFinalCellPosition : Model -> GridCoord -> FloatCoord
+getFinalCellPosition model gridCoord =
+    let
+        finalWidth =
+            20.0 * (toFloat model.grid.colCount)
+
+        currentGridWidth =
+            Grid.getGridWidth model.grid
+
+        finalHeight =
+            20.0 * (toFloat model.grid.rowCount)
+
+        currentGridHeight =
+            Grid.getGridHeight model.grid
+
+        topLeftCell =
+            { x = (currentGridWidth - finalWidth) / 2.0
+            , y = (currentGridHeight - finalHeight) / 2.0
+            }
+    in
+        { x =
+            topLeftCell.x + 20.0 * toFloat (gridCoord.col)
+        , y =
+            topLeftCell.y + 20.0 * toFloat (gridCoord.row)
+        }
+
+
+shrinkAnims : Model -> Model
+shrinkAnims model =
+    let
+        cellsGridCoords =
+            model.board
+                |> Matrix.toIndexedArray
+                |> Array.filter (\( _, cell ) -> cell.value)
+                |> Array.map (\( ( col, row ), _ ) -> { col = col, row = row })
+                |> Array.toList
+
+        coordToAnim gridCoord =
+            let
+                finalCellPosition =
+                    getFinalCellPosition model gridCoord
+            in
+                { anim =
+                    Animation.interrupt
+                        [ Animation.toWith
+                            (Animation.easing
+                                { duration = 0.7 * second
+                                , ease = Ease.outBounce
+                                }
+                            )
+                            [ Animation.x finalCellPosition.x
+                            , Animation.y finalCellPosition.y
+                            ]
+                        ]
+                        (getCellInitAnim model gridCoord)
+                , finished = False
+                }
+
+        anims =
+            cellsGridCoords
+                |> List.map (\gridCoord -> ( ( gridCoord.col, gridCoord.row ), coordToAnim gridCoord ))
+                |> Dict.fromList
+    in
+        { model | state = Won (WonAnimShrinking anims) }
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -870,7 +1030,7 @@ update msg model =
             in
                 case newModel.levels |> Maybe.andThen List.head of
                     Just level ->
-                        choseLevel level.name newModel ! [ computeBoardSize () ]
+                        choseLevel "21" newModel ! [ computeBoardSize () ]
 
                     Nothing ->
                         newModel ! []
@@ -879,26 +1039,55 @@ update msg model =
             model ! []
 
         ChoseLevel level ->
-            let
-                newModel =
-                    choseLevel level model
-            in
-                { newModel
-                    | fadeOutAnim =
-                        Animation.style
-                            [ Animation.opacity 1.0
-                            ]
-                }
-                    ! [ computeBoardSize () ]
+            choseLevel level model ! [ computeBoardSize () ]
 
         Cheat ->
             cheat model ! []
 
         Animate animMsg ->
-            { model
-                | fadeOutAnim = Animation.update animMsg model.fadeOutAnim
-            }
-                ! []
+            let
+                computeNewStyle anim =
+                    Animation.Messenger.update animMsg anim
+            in
+                case model.state of
+                    Won (WonAnimFadeOut fadeOutAnim) ->
+                        let
+                            ( newStyle, cmds ) =
+                                computeNewStyle fadeOutAnim
+                        in
+                            ( { model | state = Won <| WonAnimFadeOut newStyle }, cmds )
+
+                    Won (WonAnimShrinking shrinkAnims) ->
+                        let
+                            newAnimsAndCmds =
+                                Dict.map
+                                    (\_ shrinkAnim ->
+                                        let
+                                            animAndCmd =
+                                                computeNewStyle shrinkAnim.anim
+                                        in
+                                            ( { shrinkAnim | anim = Tuple.first animAndCmd }
+                                            , Tuple.second animAndCmd
+                                            )
+                                    )
+                                    shrinkAnims
+
+                            newAnims =
+                                Dict.map (\_ animAndCmd -> Tuple.first animAndCmd) newAnimsAndCmds
+
+                            cmds =
+                                newAnimsAndCmds
+                                    |> Dict.toList
+                                    |> List.map (Tuple.second >> Tuple.second)
+                        in
+                            { model
+                                | state =
+                                    newAnims |> WonAnimShrinking |> Won
+                            }
+                                ! cmds
+
+                    _ ->
+                        model ! []
 
         BoardSizeResult ( x, y, width, height ) ->
             { model | boundingBox = { x = x, y = y, width = width, height = height } } ! []
@@ -912,6 +1101,9 @@ update msg model =
 
         TransMousePosResult pos ->
             boardMousePos pos model ! []
+
+        EndOfFade ->
+            shrinkAnims model ! []
 
         NoOp ->
             model ! []
@@ -935,12 +1127,36 @@ port requestTransMousePos : ( Int, Int ) -> Cmd msg
 port transMousePosResult : (( Float, Float ) -> msg) -> Sub msg
 
 
+shrinkAnimsToAnimsList : ShrinkAnims -> List (Animation.Messenger.State Msg)
+shrinkAnimsToAnimsList shrinkAnims =
+    shrinkAnims
+        |> Dict.toList
+        |> List.map (Tuple.second >> .anim)
+
+
+{-| Returns an animations list depending on the current model state
+-}
+computeAnimations : Model -> List (Animation.Messenger.State Msg)
+computeAnimations model =
+    case model.state of
+        Won (WonAnimFadeOut fadeOutAnim) ->
+            [ fadeOutAnim ]
+
+        Won (WonAnimShrinking shrinkAnims) ->
+            shrinkAnims
+                |> Dict.toList
+                |> List.map (Tuple.second >> .anim)
+
+        _ ->
+            []
+
+
 subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ computeBoardSizeResult BoardSizeResult
         , boardMouseDown BoardMouseDown
         , boardMouseUp BoardMouseUp
-        , Animation.subscription Animate [ model.fadeOutAnim ]
+        , Animation.subscription Animate <| computeAnimations model
         , transMousePosResult TransMousePosResult
         ]

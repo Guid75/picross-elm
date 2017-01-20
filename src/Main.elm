@@ -80,16 +80,6 @@ type alias Model =
     }
 
 
-gridThinStroke : Float
-gridThinStroke =
-    1.0
-
-
-gridBoldStroke : Float
-gridBoldStroke =
-    3.0
-
-
 gridColor : String
 gridColor =
     "black"
@@ -150,7 +140,7 @@ getLevels =
         Http.send GetLevels request
 
 
-drawRect : Model -> GridCoord -> Svg Msg
+drawRect : Model -> GridCoord -> Svg msg
 drawRect model { col, row } =
     let
         cellCoord =
@@ -166,7 +156,7 @@ drawRect model { col, row } =
             []
 
 
-drawHovered : Model -> List (Svg Msg)
+drawHovered : Model -> List (Svg msg)
 drawHovered model =
     case model.hoveredCell of
         Nothing ->
@@ -188,7 +178,7 @@ drawHovered model =
                 ]
 
 
-drawSelected : Model -> GridCoord -> Svg Msg
+drawSelected : Model -> GridCoord -> Svg msg
 drawSelected model { col, row } =
     let
         cellCoord =
@@ -232,14 +222,13 @@ drawSelected model { col, row } =
                 , [ width <| toString <| cellSize - 2.0 * padding
                   , height <| toString <| cellSize - 2.0 * padding
                   , fill color
-                    --                  , fillOpacity <| toString opacity
                   ]
                 ]
             )
             []
 
 
-drawRejected : Model -> GridCoord -> Svg Msg
+drawRejected : Model -> GridCoord -> Svg msg
 drawRejected model { col, row } =
     let
         cellCoord =
@@ -287,7 +276,7 @@ drawRejected model { col, row } =
             ]
 
 
-drawCell : Model -> GridCoord -> Cell -> Maybe (Svg Msg)
+drawCell : Model -> GridCoord -> Cell -> Maybe (Svg msg)
 drawCell model gridCoord cell =
     case cell.userChoice of
         Selected ->
@@ -300,7 +289,7 @@ drawCell model gridCoord cell =
             Nothing
 
 
-drawCells : Model -> List (Svg Msg)
+drawCells : Model -> List (Svg msg)
 drawCells model =
     let
         filterFunc =
@@ -319,7 +308,7 @@ drawCells model =
             |> List.filterMap identity
 
 
-drawHorizontalLabelsHover : Model -> List (Svg Msg)
+drawHorizontalLabelsHover : Model -> List (Svg msg)
 drawHorizontalLabelsHover model =
     case ( model.hoveredCell, model.state ) of
         ( Just { row }, Playing ) ->
@@ -337,7 +326,7 @@ drawHorizontalLabelsHover model =
             []
 
 
-drawVerticalLabelsHover : Model -> List (Svg Msg)
+drawVerticalLabelsHover : Model -> List (Svg msg)
 drawVerticalLabelsHover model =
     case ( model.hoveredCell, model.state ) of
         ( Just { col }, Playing ) ->
@@ -375,7 +364,7 @@ isHoveredCol model testCol =
             False
 
 
-drawHorizontalLabels : Model -> List (Svg Msg)
+drawHorizontalLabels : Model -> List (Svg msg)
 drawHorizontalLabels model =
     let
         animAttrs =
@@ -387,7 +376,7 @@ drawHorizontalLabels model =
         allTips =
             MatrixUtils.getHorizontalTips <| Matrix.map .value model.board
 
-        getTipsLine : Int -> List Int -> Svg Msg
+        getTipsLine : Int -> List Int -> Svg msg
         getTipsLine index tips =
             let
                 text =
@@ -426,7 +415,7 @@ drawHorizontalLabels model =
             ]
 
 
-drawVerticalLabels : Model -> List (Svg Msg)
+drawVerticalLabels : Model -> List (Svg msg)
 drawVerticalLabels model =
     let
         animAttrs =
@@ -438,7 +427,7 @@ drawVerticalLabels model =
         allTips =
             MatrixUtils.getVerticalTips <| Matrix.map .value model.board
 
-        getTipsCol : Int -> List Int -> List (Svg Msg)
+        getTipsCol : Int -> List Int -> List (Svg msg)
         getTipsCol index tips =
             let
                 cellCoord =
@@ -508,7 +497,7 @@ selectionToList selection =
         List.foldl foldRows [] colList
 
 
-drawSelection : Model -> List (Svg Msg)
+drawSelection : Model -> List (Svg msg)
 drawSelection model =
     case model.selection of
         Nothing ->
@@ -520,7 +509,7 @@ drawSelection model =
                 |> List.map (drawRect model)
 
 
-drawWinningLabel : Model -> List (Svg Msg)
+drawWinningLabel : Model -> List (Svg msg)
 drawWinningLabel model =
     let
         gridWidth =
@@ -582,7 +571,7 @@ drawGridMouseLayer model =
         ]
 
 
-getFadeOutAnimAttrs : Model -> List (Attribute Msg)
+getFadeOutAnimAttrs : Model -> List (Attribute msg)
 getFadeOutAnimAttrs model =
     case model.state of
         Won (WonAnimFadeOut fadeOutAnim) ->
@@ -590,6 +579,20 @@ getFadeOutAnimAttrs model =
 
         _ ->
             []
+
+
+drawGridAndLabels : Model -> List (Svg msg)
+drawGridAndLabels model =
+    case model.state of
+        Won (WonAnimShrinking _) ->
+            []
+
+        _ ->
+            List.concat
+                [ [ Grid.drawGrid model.grid <| getFadeOutAnimAttrs model ]
+                , drawHorizontalLabels model
+                , drawVerticalLabels model
+                ]
 
 
 viewSvg : Model -> Html Msg
@@ -628,16 +631,7 @@ viewSvg model =
                     ]
                 <|
                     List.concat
-                        [ case model.state of
-                            Won (WonAnimShrinking _) ->
-                                []
-
-                            _ ->
-                                List.concat
-                                    [ [ Grid.drawGrid model.grid animAttrs ]
-                                    , drawHorizontalLabels model
-                                    , drawVerticalLabels model
-                                    ]
+                        [ drawGridAndLabels model
                         , drawCells model
                         , drawSelection model
                         , case ( isWinning model, model.selection ) of
@@ -681,7 +675,8 @@ levelsCombo model =
     in
         select
             [ Html.Events.on "change" levelsDecoder
-            , Html.Attributes.value <| Maybe.withDefault "1" model.currentLevel ]
+            , Html.Attributes.value <| Maybe.withDefault "1" model.currentLevel
+            ]
             options
 
 

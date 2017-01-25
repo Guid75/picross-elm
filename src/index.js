@@ -8,8 +8,8 @@ var myapp = Elm.Picross.embed(document.getElementById('main'));
 
 myapp.ports.computeBoardSize.subscribe(computeBoardSize);
 myapp.ports.requestTransMousePos.subscribe(requestTransMousePos);
+myapp.ports.requestTransMousePos2.subscribe(requestTransMousePos2);
 
-var installed;
 var pt;
 
 function computeBoardSize() {
@@ -26,39 +26,21 @@ function computeBoardSize() {
 
 function requestTransMousePos(pos) {
     var svg = document.getElementById('board');
-    installRightClickHandler(svg);
     pt = svg.createSVGPoint();
     pt.x = pos[0];
     pt.y = pos[1];
+    // console.log('requestTransMousePos', pos[0], pos[1]);
     var p = pt.matrixTransform(svg.getScreenCTM().inverse());
     myapp.ports.transMousePosResult.send([p.x, p.y]);
 }
 
-function installRightClickHandler(board) {
-    if (installed) {
-        return;
-    }
-    board.addEventListener('mousedown', function (ev) {
-        ev.preventDefault();
-        if (ev.which === 1) {
-            myapp.ports.boardMouseDown.send(1);
-        } else if (ev.which === 3) {
-            myapp.ports.boardMouseDown.send(3);
-        }
-        return false;
-    }, false);
-    board.addEventListener('mouseup', function (ev) {
-        ev.preventDefault();
-        if (ev.which === 1) {
-            myapp.ports.boardMouseUp.send(1);
-        } else if (ev.which === 3) {
-            myapp.ports.boardMouseUp.send(3);
-        }
-        return false;
-    }, false);
-    board.addEventListener('contextmenu', function (ev) {
-        ev.preventDefault();
-        return false;
-    }, false);
-    installed = true;
+function requestTransMousePos2(pos) {
+    var svg = document.getElementById('board');
+    var rect = svg.getBoundingClientRect();
+    pt = svg.createSVGPoint();
+    pt.x = pos[0]; //- rect.left;
+    pt.y = pos[1]; // - rect.top;
+    // console.log('requestTransMousePos2', pos[0] - rect.left, pos[1] - rect.top);
+    var p = pt.matrixTransform(svg.getScreenCTM().inverse());
+    myapp.ports.transMousePosResult2.send([p.x, p.y]);
 }

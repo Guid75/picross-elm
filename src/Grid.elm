@@ -7,6 +7,7 @@ module Grid
         , getGridWidth
         , getGridTopLeft
         , getClosestCell
+        , isInGrid
         )
 
 import Html
@@ -25,6 +26,14 @@ type alias Grid =
     , topLeft : FloatCoord
     , strokeColor : String
     }
+
+
+isInGrid : FloatCoord -> Grid -> Bool
+isInGrid coord grid =
+    (coord.x >= grid.topLeft.x)
+        && (coord.x < grid.topLeft.x + getGridWidth grid)
+        && (coord.y >= grid.topLeft.y)
+        && (coord.y < grid.topLeft.y + getGridHeight grid)
 
 
 getThicknessByIndex : Grid -> Int -> Float

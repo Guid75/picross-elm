@@ -13,101 +13,27 @@ import Dict exposing (Dict)
 import Matrix exposing (Matrix)
 import Http
 import Time exposing (second)
+import Mouse
 import Array
 import Animation
 import Animation.Messenger
 import Ease
 import Grid exposing (Grid)
-import Types exposing (GridCoord, FloatCoord, Coord, CellType(..), Cell, CellSelection, Level)
+import Types exposing (GridCoord, FloatCoord, Coord, CellType(..), Cell, CellSelection, Level, MouseButton(..))
 import MatrixUtils
+import Msg exposing (Msg(..), LevelChooserMsg(..))
+import Model exposing (Model, State(..), AnimState(..), ShrinkAnims)
+import LevelChooser
 
 
 main : Program Never Model Msg
 main =
     Html.program
-        { init = init
+        { init = Model.init ! [ getLevels ]
         , view = view
         , update = winningUpdateWrapper update
         , subscriptions = subscriptions
         }
-
-
-type Msg
-    = NoOp
-    | BoardMouseDown Int
-    | BoardMouseUp Int
-    | BoardSizeResult ( Float, Float, Float, Float )
-    | GetLevels (Result Http.Error (List Level))
-    | Cheat
-    | ChoseLevel String
-    | Animate Animation.Msg
-    | SvgMouseMove Coord
-    | SvgMouseLeave
-    | TransMousePosResult ( Float, Float )
-    | EndOfFade
-
-
-type State
-    = Init
-    | Playing
-    | Won AnimState
-
-
-type AnimState
-    = WonAnimFadeOut (Animation.Messenger.State Msg)
-    | WonAnimShrinking ShrinkAnims
-
-
-type alias ShrinkAnims =
-    Dict ( Int, Int ) ShrinkAnim
-
-
-type alias ShrinkAnim =
-    { anim : Animation.Messenger.State Msg
-    , finished : Bool
-    }
-
-
-type alias Model =
-    { board : Matrix Cell
-    , state : State
-    , grid : Grid
-    , hoveredCell : Maybe GridCoord
-    , selection : Maybe CellSelection
-    , levels : Maybe (List Level)
-    , currentLevel : Maybe String
-    , boundingBox : { x : Float, y : Float, width : Float, height : Float }
-    }
-
-
-gridColor : String
-gridColor =
-    "black"
-
-
-init : ( Model, Cmd Msg )
-init =
-    { board =
-        Matrix.repeat 17 20 (Cell Empty False)
-    , state = Init
-    , grid =
-        { colCount = 17
-        , rowCount = 20
-        , boldInterval = 5
-        , boldThickness = 3.0
-        , thinThickness = 1.0
-        , strokeColor = gridColor
-        , cellSize = 20.0
-        , topLeft = { x = 0.0, y = 0.0 }
-        }
-    , hoveredCell = Nothing
-    , selection = Nothing
-    , levels = Nothing
-    , currentLevel =
-        Nothing
-    , boundingBox = { x = 0.0, y = 0.0, width = 0.0, height = 0.0 }
-    }
-        ! [ getLevels ]
 
 
 int2BoolConverter : Decoder Bool
@@ -409,6 +335,7 @@ drawHorizontalLabels model =
                        , fontSize <| (toString <| model.grid.cellSize) ++ "px"
                        , x textRight
                        , fill "white"
+                       , pointerEvents "none"
                        ]
                 )
                 (List.indexedMap getTipsLine allTips)
@@ -455,6 +382,7 @@ drawVerticalLabels model =
                 (animAttrs
                     ++ [ textAnchor "middle"
                        , fontSize <| (toString <| model.grid.cellSize) ++ "px"
+                       , pointerEvents "none"
                        ]
                 )
                 (List.concat (List.indexedMap getTipsCol allTips))
@@ -534,41 +462,11 @@ drawWinningLabel model =
                 []
 
 
-mouseEvent : Decoder Coord
-mouseEvent =
+mouseEventDecoder : Decoder Coord
+mouseEventDecoder =
     decode Coord
         |> required "clientX" Json.Decode.int
         |> required "clientY" Json.Decode.int
-
-
-{-| Draw the transparent rectangle that will be used to intercept all mouse
-   events relative to the grid
--}
-drawGridMouseLayer : Model -> List (Svg Msg)
-drawGridMouseLayer model =
-    let
-        gridTopLeft =
-            Grid.getGridTopLeft model.grid
-
-        gridHeight =
-            Grid.getGridHeight model.grid
-
-        gridWidth =
-            Grid.getGridWidth model.grid
-    in
-        [ rect
-            [ x <| toString <| model.grid.topLeft.x
-            , y <| toString <| model.grid.topLeft.y
-            , width <| toString <| gridWidth
-            , height <| toString <| gridHeight
-            , fill "red"
-            , strokeWidth "0.0"
-            , opacity "0.0"
-            , Svg.Events.on "mousemove" (Json.Decode.map SvgMouseMove mouseEvent)
-            , Svg.Events.on "mouseleave" (Json.Decode.succeed SvgMouseLeave)
-            ]
-            []
-        ]
 
 
 getFadeOutAnimAttrs : Model -> List (Attribute msg)
@@ -595,30 +493,23 @@ drawGridAndLabels model =
                 ]
 
 
-viewSvg : Model -> Html Msg
-viewSvg model =
-    let
-        animAttrs =
-            getFadeOutAnimAttrs model
+getSvgContent : Model -> ( List (Svg.Attribute Msg), List (Svg Msg) )
+getSvgContent model =
+    case model.state of
+        Init ->
+            ( [], [] )
 
-        bbox =
-            model.boundingBox
-    in
-        case model.state of
-            Init ->
-                svg
-                    [ id "board"
-                    , width "800"
-                    , height "600"
-                    ]
-                    []
+        ChoosingLevel levelChooserModel ->
+            ( [ viewBox "0.0 0.0 800.0 600.0" ]
+            , LevelChooser.view levelChooserModel (Maybe.withDefault [] model.levels)
+            )
 
-            _ ->
-                svg
-                    [ id "board"
-                    , width "800"
-                    , height "600"
-                    , viewBox <|
+        _ ->
+            let
+                bbox =
+                    model.boundingBox
+            in
+                ( [ viewBox <|
                         (toString bbox.x)
                             ++ " "
                             ++ (toString bbox.y)
@@ -626,23 +517,59 @@ viewSvg model =
                             ++ (toString bbox.width)
                             ++ " "
                             ++ (toString bbox.height)
-                    , preserveAspectRatio "xMinYMin meet"
-                      --, shapeRendering "crispEdges"
-                    ]
-                <|
-                    List.concat
-                        [ drawGridAndLabels model
-                        , drawCells model
-                        , drawSelection model
-                        , case ( isWinning model, model.selection ) of
-                            ( False, Nothing ) ->
-                                drawHovered model
+                  , preserveAspectRatio "xMinYMin meet"
+                  ]
+                , List.concat
+                    [ drawGridAndLabels model
+                    , drawCells model
+                    , drawSelection model
+                    , case ( isWinning model, model.selection ) of
+                        ( False, Nothing ) ->
+                            drawHovered model
 
-                            _ ->
-                                []
-                        , drawWinningLabel model
-                        , drawGridMouseLayer model
-                        ]
+                        _ ->
+                            []
+                    , drawWinningLabel model
+                      --                    , drawGridMouseLayer model
+                    ]
+                )
+
+
+mouseButtonDecoder : (Int -> Msg) -> Decoder Msg
+mouseButtonDecoder msg =
+    Json.Decode.map msg <| Json.Decode.field "which" int
+
+
+contextMenuSuppressor : Html.Attribute Msg
+contextMenuSuppressor =
+    Html.Events.onWithOptions
+        "contextmenu"
+        { stopPropagation = True, preventDefault = True }
+        (Json.Decode.succeed NoOp)
+
+
+viewSvg : Model -> Html Msg
+viewSvg model =
+    let
+        stopOptions =
+            { stopPropagation = True, preventDefault = True }
+
+        baseAttributes =
+            [ id "board"
+            , width "800"
+            , height "600"
+            , Html.Events.onWithOptions "mousedown" { stopPropagation = False, preventDefault = True } <| mouseButtonDecoder BoardMouseDown
+            , Svg.Events.on "mousemove" (Json.Decode.map SvgMouseMove mouseEventDecoder)
+            , Svg.Events.on "mouseleave" (Json.Decode.succeed SvgMouseLeave)
+            , contextMenuSuppressor
+            ]
+
+        ( augmentAttributes, contentList ) =
+            getSvgContent model
+    in
+        svg
+            (baseAttributes ++ augmentAttributes)
+            contentList
 
 
 levelsDecoder : Decoder Msg
@@ -650,54 +577,31 @@ levelsDecoder =
     Json.Decode.map ChoseLevel Html.Events.targetValue
 
 
-levelsCombo : Model -> Html Msg
-levelsCombo model =
-    let
-        getLevelCaption level =
-            if level.description == "" then
-                level.name
-            else
-                level.name ++ " (" ++ level.description ++ ")"
-
-        options =
-            case model.levels of
-                Nothing ->
-                    [ option [] [ Html.text "<no levels>" ] ]
-
-                Just levels ->
-                    List.map
-                        (\level ->
-                            option
-                                [ Html.Attributes.value level.name ]
-                                [ Html.text <| getLevelCaption level ]
-                        )
-                        levels
-    in
-        select
-            [ Html.Events.on "change" levelsDecoder
-            , Html.Attributes.value <| Maybe.withDefault "1" model.currentLevel
-            ]
-            options
-
-
 view : Model -> Html Msg
 view model =
     div
         []
         [ viewSvg model
-        , div
-            []
-            [ Html.text "Levels "
-            , levelsCombo model
-            , button
-                [ onClick Cheat
-                , disabled <| isWinning model
-                ]
-                [ Html.text "resolve it! (cheat)" ]
-            , button
-                [ onClick (ChoseLevel <| Maybe.withDefault "1" model.currentLevel) ]
-                [ Html.text "restart it!" ]
-            ]
+        , case model.state of
+            ChoosingLevel _ ->
+                Html.text ""
+
+            _ ->
+                div
+                    []
+                    [ button
+                        [ onClick GoToLevelChooser
+                        ]
+                        [ Html.text "Return to levels menu" ]
+                    , button
+                        [ onClick Cheat
+                        , disabled <| isWinning model
+                        ]
+                        [ Html.text "resolve it! (cheat)" ]
+                    , button
+                        [ onClick (ChoseLevel <| Maybe.withDefault "1" model.currentLevel) ]
+                        [ Html.text "restart it!" ]
+                    ]
         ]
 
 
@@ -711,8 +615,18 @@ toggleCell model { col, row } =
             model
 
 
-mouseDownOnGrid : Model -> Model
-mouseDownOnGrid model =
+buttonIndexToMouseButton : Int -> MouseButton
+buttonIndexToMouseButton buttonIndex =
+    case buttonIndex of
+        1 ->
+            LeftButton
+
+        _ ->
+            RightButton
+
+
+mouseDownOnGrid : Int -> Model -> Model
+mouseDownOnGrid button model =
     let
         coordToSelection : GridCoord -> CellSelection
         coordToSelection coord =
@@ -722,6 +636,26 @@ mouseDownOnGrid model =
             model
         else
             { model | selection = Maybe.map coordToSelection model.hoveredCell }
+
+
+mouseDown : Int -> Model -> Model
+mouseDown button model =
+    let
+        newModel =
+            { model
+                | mouseButtonDown = Just <| buttonIndexToMouseButton button
+                , downSvgMousePos = model.currentSvgMousePos
+            }
+    in
+        case model.state of
+            Playing ->
+                mouseDownOnGrid button newModel
+
+            ChoosingLevel levelChooserModel ->
+                { newModel | state = ChoosingLevel { levelChooserModel | oldHorizontalOffset = levelChooserModel.horizontalOffset } }
+
+            _ ->
+                newModel
 
 
 updateBoardWithSelection : Model -> CellType -> Matrix Cell
@@ -765,44 +699,85 @@ updateBoardWithSelection model cellType =
                     List.foldr (setCell setValue) model.board selList
 
 
-mouseUpOnGrid : Int -> Model -> Model
-mouseUpOnGrid button model =
-    case isWinning model of
-        True ->
+mouseUp : Model -> Model
+mouseUp model =
+    case model.mouseButtonDown of
+        Nothing ->
             model
 
-        False ->
-            let
-                value =
-                    case button of
-                        1 ->
-                            Selected
+        Just mouseButton ->
+            case isWinning model of
+                True ->
+                    { model | mouseButtonDown = Nothing }
 
-                        _ ->
-                            Rejected
+                False ->
+                    let
+                        value =
+                            case mouseButton of
+                                LeftButton ->
+                                    Selected
 
-                board =
-                    updateBoardWithSelection model value
-            in
-                { model
-                    | selection = Nothing
-                    , board = board
-                }
+                                RightButton ->
+                                    Rejected
+
+                        board =
+                            updateBoardWithSelection model value
+                    in
+                        { model
+                            | selection = Nothing
+                            , board = board
+                            , mouseButtonDown = Nothing
+                        }
+
+
+boardMousePosOnGrid : ( Float, Float ) -> Model -> Model
+boardMousePosOnGrid ( x, y ) model =
+    let
+        closestCell =
+            Grid.getClosestCell { x = x, y = y } model.grid
+
+        hoveredCell =
+            if Grid.isInGrid { x = x, y = y } model.grid then
+                Just closestCell
+            else
+                Nothing
+
+        selection =
+            Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = closestCell }) model.selection
+    in
+        { model
+            | hoveredCell = hoveredCell
+            , selection = selection
+        }
 
 
 boardMousePos : ( Float, Float ) -> Model -> Model
 boardMousePos ( x, y ) model =
     let
-        hoveredCell =
-            Grid.getClosestCell { x = x, y = y } model.grid
-
-        selection =
-            Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = hoveredCell }) model.selection
+        newModel =
+            { model | currentSvgMousePos = Just { x = x, y = y } }
     in
-        { model
-            | hoveredCell = Just hoveredCell
-            , selection = selection
-        }
+        case ( model.state, model.mouseButtonDown ) of
+            ( Playing, _ ) ->
+                boardMousePosOnGrid ( x, y ) newModel
+
+            ( ChoosingLevel levelChooserModel, Just LeftButton ) ->
+                let
+                    currentPos =
+                        Maybe.withDefault { x = 0.0, y = 0.0 } newModel.currentSvgMousePos
+
+                    downPos =
+                        Maybe.withDefault { x = 0.0, y = 0.0 } newModel.downSvgMousePos
+
+                    diff =
+                        currentPos.x - downPos.x
+                in
+                    { newModel
+                        | state = ChoosingLevel { levelChooserModel | horizontalOffset = levelChooserModel.oldHorizontalOffset + diff }
+                    }
+
+            _ ->
+                newModel
 
 
 applyBoolBoard : Model -> Matrix Bool -> Model
@@ -1009,26 +984,53 @@ shrinkAnims model =
         { model | state = Won (WonAnimShrinking anims) }
 
 
+sortBySize : List Level -> List Level
+sortBySize levels =
+    let
+        getLevelSize level =
+            let
+                rowsCount =
+                    List.length level.content
+
+                firstCol =
+                    Maybe.withDefault [] <| List.head level.content
+
+                colsCount =
+                    List.length firstCol
+            in
+                rowsCount * colsCount
+
+        compareFunc : Level -> Level -> Order
+        compareFunc level1 level2 =
+            let
+                level1Size =
+                    getLevelSize level1
+
+                level2Size =
+                    getLevelSize level2
+            in
+                if level1Size < level2Size then
+                    LT
+                else if level1Size == level2Size then
+                    EQ
+                else
+                    GT
+    in
+        List.sortWith compareFunc levels
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         BoardMouseDown button ->
-            mouseDownOnGrid model ! []
-
-        BoardMouseUp button ->
-            mouseUpOnGrid button model ! []
+            mouseDown button model ! []
 
         GetLevels (Ok levels) ->
-            let
-                newModel =
-                    { model | levels = Just levels }
-            in
-                case newModel.levels |> Maybe.andThen List.head of
-                    Just level ->
-                        choseLevel "21" newModel ! [ computeBoardSize () ]
-
-                    Nothing ->
-                        newModel ! []
+            { model
+                | levels = Just <| sortBySize levels
+                , state = ChoosingLevel <| LevelChooser.init 800.0 600.0
+            }
+                ! []
 
         GetLevels (Err _) ->
             model ! []
@@ -1091,14 +1093,34 @@ update msg model =
             model ! [ requestTransMousePos ( coord.x, coord.y ) ]
 
         SvgMouseLeave ->
-            { model | hoveredCell = Nothing }
+            { model
+                | hoveredCell = Nothing
+                , currentSvgMousePos = Nothing
+            }
                 ! []
 
         TransMousePosResult pos ->
+            model ! []
+
+        TransMousePosResult2 pos ->
             boardMousePos pos model ! []
 
         EndOfFade ->
             shrinkAnims model ! []
+
+        MousePos { x, y } ->
+            model ! [ requestTransMousePos2 ( x, y ) ]
+
+        MouseUp { x, y } ->
+            mouseUp model ! []
+
+        LevelChooserMsg levelChooserMsg ->
+            case levelChooserMsg of
+                ClickOnTile name ->
+                    choseLevel name model ! [ computeBoardSize () ]
+
+        GoToLevelChooser ->
+            { model | state = ChoosingLevel <| LevelChooser.init 800.0 600.0 } ! []
 
         NoOp ->
             model ! []
@@ -1110,16 +1132,16 @@ port computeBoardSize : () -> Cmd msg
 port computeBoardSizeResult : (( Float, Float, Float, Float ) -> msg) -> Sub msg
 
 
-port boardMouseDown : (Int -> msg) -> Sub msg
-
-
-port boardMouseUp : (Int -> msg) -> Sub msg
-
-
 port requestTransMousePos : ( Int, Int ) -> Cmd msg
 
 
+port requestTransMousePos2 : ( Int, Int ) -> Cmd msg
+
+
 port transMousePosResult : (( Float, Float ) -> msg) -> Sub msg
+
+
+port transMousePosResult2 : (( Float, Float ) -> msg) -> Sub msg
 
 
 shrinkAnimsToAnimsList : ShrinkAnims -> List (Animation.Messenger.State Msg)
@@ -1150,8 +1172,9 @@ subscriptions : Model -> Sub Msg
 subscriptions model =
     Sub.batch
         [ computeBoardSizeResult BoardSizeResult
-        , boardMouseDown BoardMouseDown
-        , boardMouseUp BoardMouseUp
         , Animation.subscription Animate <| computeAnimations model
         , transMousePosResult TransMousePosResult
+        , transMousePosResult2 TransMousePosResult2
+        , Mouse.moves MousePos
+        , Mouse.ups MouseUp
         ]

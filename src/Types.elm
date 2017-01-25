@@ -7,6 +7,7 @@ module Types
         , Cell
         , CellSelection
         , Level
+        , MouseButton(..)
         )
 
 
@@ -51,3 +52,8 @@ type alias Level =
     , description : String
     , content : List (List Bool)
     }
+
+
+type MouseButton
+    = LeftButton
+    | RightButton

@@ -1115,9 +1115,17 @@ update msg model =
             mouseUp model ! []
 
         LevelChooserMsg levelChooserMsg ->
-            case levelChooserMsg of
-                ClickOnTile name ->
-                    choseLevel name model ! [ computeBoardSize () ]
+            case model.state of
+                ChoosingLevel levelChooserModel ->
+                    case levelChooserMsg of
+                        MouseUpOnTile title ->
+                            if model.currentSvgMousePos == model.downSvgMousePos then
+                                choseLevel title model ! [ computeBoardSize () ]
+                            else
+                                model ! []
+
+                _ ->
+                    model ! []
 
         GoToLevelChooser ->
             { model | state = ChoosingLevel <| LevelChooser.init 800.0 600.0 } ! []

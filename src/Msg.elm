@@ -24,5 +24,6 @@ type Msg
     | MousePos { x : Int, y : Int }
     | MouseUp { x : Int, y : Int }
 
+
 type LevelChooserMsg
-    = ClickOnTile String
+    = MouseUpOnTile String

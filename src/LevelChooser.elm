@@ -61,7 +61,7 @@ drawTile model index level =
     in
         g
             [ Svg.Attributes.cursor "pointer"
-            , Svg.Events.onClick <| LevelChooserMsg <| ClickOnTile <| level.name
+            , Svg.Events.onMouseUp <| LevelChooserMsg <| MouseUpOnTile <| level.name
             ]
             [ rect
                 [ x <| toString <| padding + (toFloat col) * (padding + tileSize)

@@ -462,13 +462,6 @@ drawWinningLabel model =
                 []
 
 
-mouseEventDecoder : Decoder Coord
-mouseEventDecoder =
-    decode Coord
-        |> required "clientX" Json.Decode.int
-        |> required "clientY" Json.Decode.int
-
-
 getFadeOutAnimAttrs : Model -> List (Attribute msg)
 getFadeOutAnimAttrs model =
     case model.state of
@@ -530,7 +523,6 @@ getSvgContent model =
                         _ ->
                             []
                     , drawWinningLabel model
-                      --                    , drawGridMouseLayer model
                     ]
                 )
 
@@ -559,7 +551,6 @@ viewSvg model =
             , width "800"
             , height "600"
             , Html.Events.onWithOptions "mousedown" { stopPropagation = False, preventDefault = True } <| mouseButtonDecoder BoardMouseDown
-            , Svg.Events.on "mousemove" (Json.Decode.map SvgMouseMove mouseEventDecoder)
             , Svg.Events.on "mouseleave" (Json.Decode.succeed SvgMouseLeave)
             , contextMenuSuppressor
             ]
@@ -1089,9 +1080,6 @@ update msg model =
         BoardSizeResult ( x, y, width, height ) ->
             { model | boundingBox = { x = x, y = y, width = width, height = height } } ! []
 
-        SvgMouseMove coord ->
-            model ! [ requestTransMousePos ( coord.x, coord.y ) ]
-
         SvgMouseLeave ->
             { model
                 | hoveredCell = Nothing
@@ -1099,17 +1087,14 @@ update msg model =
             }
                 ! []
 
-        TransMousePosResult pos ->
-            model ! []
-
-        TransMousePosResult2 pos ->
+        SvgMousePosResult pos ->
             boardMousePos pos model ! []
 
         EndOfFade ->
             shrinkAnims model ! []
 
         MousePos { x, y } ->
-            model ! [ requestTransMousePos2 ( x, y ) ]
+            model ! [ requestSvgMousePos ( x, y ) ]
 
         MouseUp { x, y } ->
             mouseUp model ! []
@@ -1140,16 +1125,10 @@ port computeBoardSize : () -> Cmd msg
 port computeBoardSizeResult : (( Float, Float, Float, Float ) -> msg) -> Sub msg
 
 
-port requestTransMousePos : ( Int, Int ) -> Cmd msg
+port requestSvgMousePos : ( Int, Int ) -> Cmd msg
 
 
-port requestTransMousePos2 : ( Int, Int ) -> Cmd msg
-
-
-port transMousePosResult : (( Float, Float ) -> msg) -> Sub msg
-
-
-port transMousePosResult2 : (( Float, Float ) -> msg) -> Sub msg
+port svgMousePosResult : (( Float, Float ) -> msg) -> Sub msg
 
 
 shrinkAnimsToAnimsList : ShrinkAnims -> List (Animation.Messenger.State Msg)
@@ -1181,8 +1160,7 @@ subscriptions model =
     Sub.batch
         [ computeBoardSizeResult BoardSizeResult
         , Animation.subscription Animate <| computeAnimations model
-        , transMousePosResult TransMousePosResult
-        , transMousePosResult2 TransMousePosResult2
+        , svgMousePosResult SvgMousePosResult
         , Mouse.moves MousePos
         , Mouse.ups MouseUp
         ]

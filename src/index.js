@@ -7,10 +7,7 @@ var Elm = require('./Main');
 var myapp = Elm.Picross.embed(document.getElementById('main'));
 
 myapp.ports.computeBoardSize.subscribe(computeBoardSize);
-myapp.ports.requestTransMousePos.subscribe(requestTransMousePos);
-myapp.ports.requestTransMousePos2.subscribe(requestTransMousePos2);
-
-var pt;
+myapp.ports.requestSvgMousePos.subscribe(requestSvgMousePos);
 
 function computeBoardSize() {
     var board = document.getElementById('board');
@@ -24,23 +21,13 @@ function computeBoardSize() {
     }, 10);
 }
 
-function requestTransMousePos(pos) {
-    var svg = document.getElementById('board');
-    pt = svg.createSVGPoint();
-    pt.x = pos[0];
-    pt.y = pos[1];
-    // console.log('requestTransMousePos', pos[0], pos[1]);
-    var p = pt.matrixTransform(svg.getScreenCTM().inverse());
-    myapp.ports.transMousePosResult.send([p.x, p.y]);
-}
 
-function requestTransMousePos2(pos) {
+function requestSvgMousePos(pos) {
     var svg = document.getElementById('board');
     var rect = svg.getBoundingClientRect();
-    pt = svg.createSVGPoint();
-    pt.x = pos[0]; //- rect.left;
-    pt.y = pos[1]; // - rect.top;
-    // console.log('requestTransMousePos2', pos[0] - rect.left, pos[1] - rect.top);
+    var pt = svg.createSVGPoint();
+    pt.x = pos[0];
+    pt.y = pos[1];
     var p = pt.matrixTransform(svg.getScreenCTM().inverse());
-    myapp.ports.transMousePosResult2.send([p.x, p.y]);
+    myapp.ports.svgMousePosResult.send([p.x, p.y]);
 }

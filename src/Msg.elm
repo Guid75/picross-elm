@@ -15,10 +15,8 @@ type Msg
     | GoToLevelChooser
     | ChoseLevel String
     | Animate Animation.Msg
-    | SvgMouseMove Coord
     | SvgMouseLeave
-    | TransMousePosResult ( Float, Float )
-    | TransMousePosResult2 ( Float, Float )
+    | SvgMousePosResult ( Float, Float )
     | EndOfFade
     | LevelChooserMsg LevelChooserMsg
     | MousePos { x : Int, y : Int }

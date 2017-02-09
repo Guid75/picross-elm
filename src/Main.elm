@@ -494,7 +494,7 @@ getSvgContent model =
 
         ChoosingLevel levelChooserModel ->
             ( [ viewBox "0.0 0.0 800.0 600.0" ]
-            , LevelChooser.view levelChooserModel (Maybe.withDefault [] model.levels)
+            , LevelChooser.view levelChooserModel
             )
 
         _ ->
@@ -645,7 +645,7 @@ mouseDown button model =
                 mouseDownOnGrid newModel
 
             ChoosingLevel levelChooserModel ->
-                { newModel | state = ChoosingLevel { levelChooserModel | oldHorizontalOffset = levelChooserModel.horizontalOffset } }
+                { newModel | state = ChoosingLevel <| LevelChooser.mouseDown levelChooserModel }
 
             _ ->
                 newModel
@@ -761,12 +761,9 @@ boardMousePos ( x, y ) model =
 
                     downPos =
                         Maybe.withDefault { x = 0.0, y = 0.0 } newModel.downSvgMousePos
-
-                    diff =
-                        currentPos.x - downPos.x
                 in
                     { newModel
-                        | state = ChoosingLevel { levelChooserModel | horizontalOffset = levelChooserModel.oldHorizontalOffset + diff }
+                        | state = ChoosingLevel <| LevelChooser.mouseMoveWithLeftButton downPos currentPos levelChooserModel
                     }
 
             _ ->
@@ -1022,7 +1019,7 @@ update msg model =
         GetLevels (Ok levels) ->
             { model
                 | levels = Just <| sortBySize levels
-                , state = ChoosingLevel <| LevelChooser.init 800.0 600.0
+                , state = ChoosingLevel <| LevelChooser.init (sortBySize levels) 800.0 600.0
             }
                 ! []
 
@@ -1116,7 +1113,7 @@ update msg model =
                     model ! []
 
         GoToLevelChooser ->
-            { model | state = ChoosingLevel <| LevelChooser.init 800.0 600.0 } ! []
+            { model | state = ChoosingLevel <| LevelChooser.init (Maybe.withDefault [] model.levels) 800.0 600.0 } ! []
 
         NoOp ->
             model ! []

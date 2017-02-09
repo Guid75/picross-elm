@@ -1,16 +1,17 @@
-module LevelChooser exposing (view, Model, init)
+module LevelChooser exposing (view, Model, init, mouseDown, mouseMoveWithLeftButton)
 
 import Svg exposing (Svg, rect, g, text_, tspan)
 import Svg.Attributes exposing (x, y, rx, ry, width, height, fill, transform, fontSize)
 import Svg.Events
 import Msg exposing (Msg(..), LevelChooserMsg(..))
-import Types exposing (Level)
+import Types exposing (Level, FloatCoord)
 
 
 {-| padding goes from 0.0 to 1.0
 -}
 type alias Model =
-    { width : Float
+    { levels : List Level
+    , width : Float
     , height : Float
     , padding : Float
     , verticalTilesCount : Int
@@ -19,9 +20,10 @@ type alias Model =
     }
 
 
-init : Float -> Float -> Model
-init width height =
-    { width = width
+init : List Level -> Float -> Float -> Model
+init levels width height =
+    { levels = levels
+    , width = width
     , height = height
     , padding = 0.2
     , verticalTilesCount = 4
@@ -37,6 +39,13 @@ computeTileSize model =
             toFloat model.verticalTilesCount
     in
         model.height / ((vtc * (1.0 + model.padding) + model.padding))
+
+
+{-| Returns the number of horizontal tiles that will the entire board
+-}
+getHorizontalTilesSize : Model -> Int
+getHorizontalTilesSize model =
+    1 + ((List.length model.levels) - 1) // model.verticalTilesCount
 
 
 computePaddingSize : Model -> Float
@@ -103,16 +112,16 @@ getLevelSizeText level =
         (toString colsCount) ++ "x" ++ (toString rowsCount)
 
 
-drawTiles : Model -> List Level -> Svg Msg
-drawTiles model levels =
-    levels
+drawTiles : Model -> Svg Msg
+drawTiles model =
+    model.levels
         |> List.indexedMap (drawTile model)
         |> g
             [ transform <| "translate(" ++ (toString model.horizontalOffset) ++ ")" ]
 
 
-view : Model -> List Level -> List (Svg Msg)
-view model levels =
+view : Model -> List (Svg Msg)
+view model =
     List.concat
         [ [ rect
                 [ x <| "0.0"
@@ -123,5 +132,38 @@ view model levels =
                 ]
                 []
           ]
-        , [ drawTiles model levels ]
+        , [ drawTiles model ]
         ]
+
+
+mouseDown : Model -> Model
+mouseDown model =
+    { model | oldHorizontalOffset = model.horizontalOffset }
+
+
+mouseMoveWithLeftButton : FloatCoord -> FloatCoord -> Model -> Model
+mouseMoveWithLeftButton downPos currentPos model =
+    let
+        diff =
+            currentPos.x - downPos.x
+
+        projectedOffset =
+            model.oldHorizontalOffset + diff
+
+        padding =
+            computePaddingSize model
+
+        boardWidth =
+            (toFloat <| (getHorizontalTilesSize model)) * (computeTileSize model + padding) + padding
+
+        newOffset =
+            if projectedOffset > 0 then
+                0
+            else if projectedOffset < -(boardWidth - model.width) then
+                -(boardWidth - model.width)
+            else
+                projectedOffset
+    in
+        { model
+            | horizontalOffset = newOffset
+        }

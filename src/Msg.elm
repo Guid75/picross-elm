@@ -3,12 +3,12 @@ module Msg exposing (Msg(..), LevelChooserMsg(..))
 import Http
 import Animation
 import Animation.Messenger
-import Types exposing (Level, Coord)
+import Types exposing (Level, Coord, MouseButton)
 
 
 type Msg
     = NoOp
-    | BoardMouseDown Int
+    | BoardMouseDown MouseButton
     | BoardSizeResult ( Float, Float, Float, Float )
     | GetLevels (Result Http.Error (List Level))
     | Cheat

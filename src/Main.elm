@@ -36,9 +36,9 @@ main =
         }
 
 
-int2BoolConverter : Decoder Bool
-int2BoolConverter =
-    Json.Decode.map (\v -> v > 0) int
+int2BoolDecoder : Decoder Bool
+int2BoolDecoder =
+    Json.Decode.map ((==) 1) int
 
 
 decodeLevel : Decoder Level
@@ -46,7 +46,7 @@ decodeLevel =
     decode Level
         |> required "name" Json.Decode.string
         |> optional "description" Json.Decode.string ""
-        |> required "content" (list <| list int2BoolConverter)
+        |> required "content" (list <| list int2BoolDecoder)
 
 
 decodeLevels : Decoder (List Level)
@@ -527,9 +527,11 @@ getSvgContent model =
                 )
 
 
-mouseButtonDecoder : (Int -> Msg) -> Decoder Msg
+mouseButtonDecoder : (MouseButton -> Msg) -> Decoder Msg
 mouseButtonDecoder msg =
-    Json.Decode.map msg <| Json.Decode.field "which" int
+    Json.Decode.field "which" int
+        |> Json.Decode.map buttonIndexToMouseButton
+        |> Json.Decode.map msg
 
 
 contextMenuSuppressor : Html.Attribute Msg
@@ -616,8 +618,8 @@ buttonIndexToMouseButton buttonIndex =
             RightButton
 
 
-mouseDownOnGrid : Int -> Model -> Model
-mouseDownOnGrid button model =
+mouseDownOnGrid : Model -> Model
+mouseDownOnGrid model =
     let
         coordToSelection : GridCoord -> CellSelection
         coordToSelection coord =
@@ -629,18 +631,18 @@ mouseDownOnGrid button model =
             { model | selection = Maybe.map coordToSelection model.hoveredCell }
 
 
-mouseDown : Int -> Model -> Model
+mouseDown : MouseButton -> Model -> Model
 mouseDown button model =
     let
         newModel =
             { model
-                | mouseButtonDown = Just <| buttonIndexToMouseButton button
+                | mouseButtonDown = Just button
                 , downSvgMousePos = model.currentSvgMousePos
             }
     in
         case model.state of
             Playing ->
-                mouseDownOnGrid button newModel
+                mouseDownOnGrid newModel
 
             ChoosingLevel levelChooserModel ->
                 { newModel | state = ChoosingLevel { levelChooserModel | oldHorizontalOffset = levelChooserModel.horizontalOffset } }
@@ -978,6 +980,7 @@ shrinkAnims model =
 sortBySize : List Level -> List Level
 sortBySize levels =
     let
+        getLevelSize : Level -> Int
         getLevelSize level =
             let
                 rowsCount =

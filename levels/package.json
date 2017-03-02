@@ -1,0 +1,15 @@
+{
+  "name": "leveltools",
+  "version": "1.0.0",
+  "description": "",
+  "main": "concat.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "recursive-readdir": "^2.1.1",
+    "uuid": "^3.0.1"
+  }
+}

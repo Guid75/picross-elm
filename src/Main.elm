@@ -45,6 +45,7 @@ decodeLevel : Decoder Level
 decodeLevel =
     decode Level
         |> required "name" Json.Decode.string
+        |> required "uuid" Json.Decode.string
         |> optional "description" Json.Decode.string ""
         |> required "content" (list <| list int2BoolDecoder)
 

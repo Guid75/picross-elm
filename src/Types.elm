@@ -49,6 +49,7 @@ type alias CellSelection =
 
 type alias Level =
     { name : String
+    , uuid : String
     , description : String
     , content : List (List Bool)
     }

@@ -26,10 +26,17 @@ import Model exposing (Model, State(..), AnimState(..), ShrinkAnims)
 import LevelChooser
 
 
-main : Program Never Model Msg
+type alias Flags =
+    { doneLevels : List String
+    , foo : Int
+    }
+
+
+main : Program Flags Model Msg
 main =
-    Html.program
-        { init = Model.init ! [ getLevels ]
+    Html.programWithFlags
+        { init =
+            (\{ doneLevels, foo } -> Model.init doneLevels ! [ getLevels ])
         , view = view
         , update = winningUpdateWrapper update
         , subscriptions = subscriptions
@@ -790,20 +797,20 @@ applyBoolBoard model board =
         }
 
 
-getLevelByName : String -> List Level -> Maybe Level
-getLevelByName name levels =
-    List.Extra.find (.name >> (==) name) levels
+getLevelByUuid : String -> List Level -> Maybe Level
+getLevelByUuid uuid levels =
+    List.Extra.find (.uuid >> (==) uuid) levels
 
 
 choseLevel : String -> Model -> Model
-choseLevel levelName model =
+choseLevel levelUuid model =
     let
         maybeModel =
             model.levels
-                |> Maybe.andThen (getLevelByName levelName)
+                |> Maybe.andThen (getLevelByUuid levelUuid)
                 |> Maybe.andThen (\level -> Matrix.fromList level.content)
                 |> Maybe.andThen (\board -> Just <| applyBoolBoard model board)
-                |> Maybe.andThen (\model -> Just { model | currentLevel = Just levelName, state = Playing })
+                |> Maybe.andThen (\model -> Just { model | currentLevel = Just levelUuid, state = Playing })
     in
         Maybe.withDefault model maybeModel
 
@@ -872,6 +879,9 @@ winningUpdateWrapper updateFunc msg model =
 
         newModel =
             checkWinning updateModel
+
+        newDoneLevels =
+            storeLevelToDoneLevels (Maybe.withDefault "1" newModel.currentLevel) model.doneLevels
     in
         if isWinning newModel && not oldWinning then
             ( { newModel
@@ -890,11 +900,22 @@ winningUpdateWrapper updateFunc msg model =
                         getFadeOutInitialStyle
                         |> WonAnimFadeOut
                         |> Won
+                , doneLevels = newDoneLevels
               }
-            , cmd
+            , Cmd.batch [ cmd, save <| ( newDoneLevels, 4 ) ]
             )
         else
             ( newModel, cmd )
+
+
+storeLevelToDoneLevels : String -> List String -> List String
+storeLevelToDoneLevels levelUuid levels =
+    case List.member levelUuid levels of
+        True ->
+            levels
+
+        False ->
+            levelUuid :: levels
 
 
 getCellInitAnim : Model -> GridCoord -> Animation.Messenger.State Msg
@@ -1020,7 +1041,7 @@ update msg model =
         GetLevels (Ok levels) ->
             { model
                 | levels = Just <| sortBySize levels
-                , state = ChoosingLevel <| LevelChooser.init (sortBySize levels) 800.0 600.0
+                , state = ChoosingLevel <| LevelChooser.init (sortBySize levels) 800.0 600.0 model.doneLevels
             }
                 ! []
 
@@ -1104,9 +1125,9 @@ update msg model =
             case model.state of
                 ChoosingLevel levelChooserModel ->
                     case levelChooserMsg of
-                        MouseUpOnTile title ->
+                        MouseUpOnTile levelUuid ->
                             if model.currentSvgMousePos == model.downSvgMousePos then
-                                choseLevel title model ! [ computeBoardSize () ]
+                                choseLevel levelUuid model ! [ computeBoardSize () ]
                             else
                                 model ! []
 
@@ -1114,7 +1135,7 @@ update msg model =
                     model ! []
 
         GoToLevelChooser ->
-            { model | state = ChoosingLevel <| LevelChooser.init (Maybe.withDefault [] model.levels) 800.0 600.0 } ! []
+            { model | state = ChoosingLevel <| LevelChooser.init (Maybe.withDefault [] model.levels) 800.0 600.0 model.doneLevels } ! []
 
         NoOp ->
             model ! []
@@ -1130,6 +1151,9 @@ port requestSvgMousePos : ( Int, Int ) -> Cmd msg
 
 
 port svgMousePosResult : (( Float, Float ) -> msg) -> Sub msg
+
+
+port save : ( List String, Int ) -> Cmd msg
 
 
 shrinkAnimsToAnimsList : ShrinkAnims -> List (Animation.Messenger.State Msg)

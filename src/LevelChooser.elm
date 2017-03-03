@@ -17,11 +17,12 @@ type alias Model =
     , verticalTilesCount : Int
     , horizontalOffset : Float
     , oldHorizontalOffset : Float
+    , doneLevels : List String
     }
 
 
-init : List Level -> Float -> Float -> Model
-init levels width height =
+init : List Level -> Float -> Float -> List String -> Model
+init levels width height doneLevels =
     { levels = levels
     , width = width
     , height = height
@@ -29,6 +30,7 @@ init levels width height =
     , verticalTilesCount = 4
     , horizontalOffset = 0.0
     , oldHorizontalOffset = 0.0
+    , doneLevels = doneLevels
     }
 
 
@@ -67,10 +69,15 @@ drawTile model index level =
 
         col =
             index // model.verticalTilesCount
+
+        tileColor =
+            case List.member level.uuid model.doneLevels of
+                True -> "green"
+                False -> "blue"
     in
         g
             [ Svg.Attributes.cursor "pointer"
-            , Svg.Events.onMouseUp <| LevelChooserMsg <| MouseUpOnTile <| level.name
+            , Svg.Events.onMouseUp <| LevelChooserMsg <| MouseUpOnTile <| level.uuid
             ]
             [ rect
                 [ x <| toString <| padding + (toFloat col) * (padding + tileSize)
@@ -79,7 +86,7 @@ drawTile model index level =
                 , rx "8.0"
                 , width <| toString tileSize
                 , height <| toString tileSize
-                , fill "blue"
+                , fill tileColor
                 ]
                 []
             , text_

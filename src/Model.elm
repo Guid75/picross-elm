@@ -51,11 +51,12 @@ type alias Model =
     , levels : Maybe (List Level)
     , currentLevel : Maybe String
     , boundingBox : { x : Float, y : Float, width : Float, height : Float }
+    , doneLevels : List String
     }
 
 
-init : Model
-init =
+init : List String -> Model
+init doneLevels =
     { board =
         Matrix.repeat 17 20 (Cell Empty False)
     , state = Init
@@ -78,6 +79,7 @@ init =
     , currentLevel =
         Nothing
     , boundingBox = { x = 0.0, y = 0.0, width = 0.0, height = 0.0 }
+    , doneLevels = doneLevels
     }
 
 

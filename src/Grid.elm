@@ -3,8 +3,8 @@ module Grid
         ( Grid
         , drawGrid
         , getCellCoord
-        , getGridHeight
-        , getGridWidth
+        , computeGridHeight
+        , computeGridWidth
         , getGridTopLeft
         , getClosestCell
         , isInGrid
@@ -31,9 +31,9 @@ type alias Grid =
 isInGrid : FloatCoord -> Grid -> Bool
 isInGrid coord grid =
     (coord.x >= grid.topLeft.x)
-        && (coord.x < grid.topLeft.x + getGridWidth grid)
+        && (coord.x < grid.topLeft.x + computeGridWidth grid)
         && (coord.y >= grid.topLeft.y)
-        && (coord.y < grid.topLeft.y + getGridHeight grid)
+        && (coord.y < grid.topLeft.y + computeGridHeight grid)
 
 
 getThicknessByIndex : Grid -> Int -> Float
@@ -54,7 +54,7 @@ drawVerticalLine grid colIndex lines =
             [ x1 <| toString <| x + grid.topLeft.x
             , y1 <| toString grid.topLeft.y
             , x2 <| toString <| x + grid.topLeft.x
-            , y2 <| toString <| getGridHeight grid + grid.topLeft.y
+            , y2 <| toString <| computeGridHeight grid + grid.topLeft.y
             , stroke grid.strokeColor
             , strokeWidth <| toString <| getThicknessByIndex grid colIndex
             ]
@@ -72,7 +72,7 @@ drawHorizontalLine grid rowIndex lines =
         (line
             [ x1 <| toString grid.topLeft.x
             , y1 <| toString <| y + grid.topLeft.y
-            , x2 <| toString <| getGridWidth grid + grid.topLeft.x
+            , x2 <| toString <| computeGridWidth grid + grid.topLeft.x
             , y2 <| toString <| y + grid.topLeft.y
             , stroke grid.strokeColor
             , strokeWidth <| toString <| getThicknessByIndex grid rowIndex
@@ -94,8 +94,8 @@ getNthLineOffset grid lineNumber =
         toFloat lineNumber * grid.cellSize + toFloat (lineNumber - dec) * grid.thinThickness + toFloat dec * grid.boldThickness + thickness / 2.0
 
 
-getGridWidth : Grid -> Float
-getGridWidth grid =
+computeGridWidth : Grid -> Float
+computeGridWidth grid =
     let
         lastLineIndex =
             grid.colCount
@@ -109,8 +109,8 @@ getGridWidth grid =
         offset + thickness / 2.0
 
 
-getGridHeight : Grid -> Float
-getGridHeight grid =
+computeGridHeight : Grid -> Float
+computeGridHeight grid =
     let
         lastLineIndex =
             grid.rowCount

@@ -19,7 +19,7 @@ import Animation
 import Animation.Messenger
 import Ease
 import Grid exposing (Grid)
-import Types exposing (GridCoord, FloatCoord, Coord, CellType(..), Cell, CellSelection, Level, MouseButton(..))
+import Types exposing (..)
 import MatrixUtils
 import Msg exposing (Msg(..), LevelChooserMsg(..))
 import Model exposing (Model, State(..), AnimState(..), ShrinkAnims)
@@ -397,35 +397,22 @@ drawVerticalLabels model =
             ]
 
 
-selectionToRectangle : CellSelection -> ( GridCoord, GridCoord )
-selectionToRectangle selection =
-    let
-        ( col1, col2 ) =
-            if selection.firstCell.col <= selection.lastCell.col then
-                ( selection.firstCell.col, selection.lastCell.col )
-            else
-                ( selection.lastCell.col, selection.firstCell.col )
-
-        ( row1, row2 ) =
-            if selection.firstCell.row <= selection.lastCell.row then
-                ( selection.firstCell.row, selection.lastCell.row )
-            else
-                ( selection.lastCell.row, selection.firstCell.row )
-    in
-        ( { col = col1, row = row1 }, { col = col2, row = row2 } )
+sizeRange : Int -> Int -> List Int
+sizeRange start size =
+    List.range start <| start + size - 1
 
 
 selectionToList : CellSelection -> List GridCoord
 selectionToList selection =
     let
-        ( topLeft, bottomRight ) =
-            selectionToRectangle selection
+        area =
+            selectionToArea selection
 
         colList =
-            List.map ((+) topLeft.col) <| List.range 0 (bottomRight.col - topLeft.col)
+            sizeRange area.topLeft.col area.size.width
 
         rowList =
-            List.map ((+) topLeft.row) <| List.range 0 (bottomRight.row - topLeft.row)
+            sizeRange area.topLeft.row area.size.height
 
         foldRows col l =
             List.foldl (\row l -> { col = col, row = row } :: l) l rowList
@@ -449,10 +436,10 @@ drawWinningLabel : Model -> List (Svg msg)
 drawWinningLabel model =
     let
         gridWidth =
-            Grid.getGridWidth model.grid
+            Grid.computeGridWidth model.grid
 
         gridHeight =
-            Grid.getGridHeight model.grid
+            Grid.computeGridHeight model.grid
     in
         case isWinning model of
             True ->
@@ -631,7 +618,7 @@ mouseDownOnGrid model =
     let
         coordToSelection : GridCoord -> CellSelection
         coordToSelection coord =
-            { firstCell = coord, lastCell = coord }
+            { fixed = coord, floating = coord }
     in
         if isWinning model then
             model
@@ -693,7 +680,7 @@ updateBoardWithSelection model cellType =
                         selectionToList selection
 
                     setValue =
-                        Matrix.get selection.firstCell.col selection.firstCell.row model.board
+                        Matrix.get selection.fixed.col selection.fixed.row model.board
                             |> Maybe.map (.userChoice >> toggleValue)
                             |> Maybe.withDefault Selected
                 in
@@ -744,7 +731,7 @@ boardMousePosOnGrid ( x, y ) model =
                 Nothing
 
         selection =
-            Maybe.map (\selection -> { firstCell = selection.firstCell, lastCell = closestCell }) model.selection
+            Maybe.map (\selection -> { fixed = selection.fixed, floating = closestCell }) model.selection
     in
         { model
             | hoveredCell = hoveredCell
@@ -937,13 +924,13 @@ getFinalCellPosition model gridCoord =
             20.0 * (toFloat model.grid.colCount)
 
         currentGridWidth =
-            Grid.getGridWidth model.grid
+            Grid.computeGridWidth model.grid
 
         finalHeight =
             20.0 * (toFloat model.grid.rowCount)
 
         currentGridHeight =
-            Grid.getGridHeight model.grid
+            Grid.computeGridHeight model.grid
 
         topLeftCell =
             { x = (currentGridWidth - finalWidth) / 2.0

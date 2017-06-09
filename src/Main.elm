@@ -74,22 +74,6 @@ getLevels =
         Http.send GetLevels request
 
 
-drawRect : Model -> GridCoord -> Svg msg
-drawRect model { col, row } =
-    let
-        cellCoord =
-            Grid.getCellCoord col row model.grid
-    in
-        rect
-            [ x <| toString <| cellCoord.x + 1.0
-            , y <| toString <| cellCoord.y + 1.0
-            , width <| toString <| model.grid.cellSize - 2.0
-            , height <| toString <| model.grid.cellSize - 2.0
-            , fill "red"
-            ]
-            []
-
-
 drawHovered : Model -> List (Svg msg)
 drawHovered model =
     case model.hoveredCell of
@@ -393,8 +377,8 @@ sizeRange start size =
     List.range start <| start + size - 1
 
 
-selectionToList : CellSelection -> List GridCoord
-selectionToList selection =
+selectionToCoordList : CellSelection -> List GridCoord
+selectionToCoordList selection =
     let
         area =
             selectionToArea selection
@@ -419,8 +403,8 @@ drawSelection model =
 
         Just selection ->
             selection
-                |> selectionToList
-                |> List.map (drawRect model)
+                |> selectionToCoordList
+                |> List.map (Grid.drawRect model.grid "violet")
 
 
 drawWinningLabel : Model -> List (Svg msg)
@@ -668,7 +652,7 @@ updateBoardWithSelection model cellType =
             Just selection ->
                 let
                     selList =
-                        selectionToList selection
+                        selectionToCoordList selection
 
                     setValue =
                         Matrix.get selection.fixed.col selection.fixed.row model.board

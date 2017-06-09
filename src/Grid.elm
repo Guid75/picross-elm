@@ -8,10 +8,11 @@ module Grid
         , getGridTopLeft
         , getClosestCell
         , isInGrid
+        , drawRect
         )
 
 import Html
-import Svg exposing (Svg, line, g)
+import Svg exposing (Svg, line, g, rect)
 import Svg.Attributes exposing (..)
 import Types exposing (FloatCoord, GridCoord)
 
@@ -42,6 +43,22 @@ getThicknessByIndex grid index =
         grid.boldThickness
     else
         grid.thinThickness
+
+
+drawRect : Grid -> String -> GridCoord -> Svg msg
+drawRect grid color { col, row } =
+    let
+        cellCoord =
+            getCellCoord col row grid
+    in
+        rect
+            [ x <| toString <| cellCoord.x + 1.0
+            , y <| toString <| cellCoord.y + 1.0
+            , width <| toString <| grid.cellSize - 2.0
+            , height <| toString <| grid.cellSize - 2.0
+            , fill color
+            ]
+            []
 
 
 drawVerticalLine : Grid -> Int -> List (Svg msg) -> List (Svg msg)

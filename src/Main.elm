@@ -278,24 +278,9 @@ drawVerticalLabelsHover model =
             []
 
 
-isHoveredRow : Model -> Int -> Bool
-isHoveredRow model testRow =
-    case model.hoveredCell of
-        Just { row } ->
-            testRow == row
-
-        Nothing ->
-            False
-
-
-isHoveredCol : Model -> Int -> Bool
-isHoveredCol model testCol =
-    case model.hoveredCell of
-        Just { col } ->
-            testCol == col
-
-        Nothing ->
-            False
+concreteGridCoord : Maybe GridCoord -> GridCoord
+concreteGridCoord maybeGridCoord =
+    Maybe.withDefault (GridCoord -1 -1) maybeGridCoord
 
 
 drawHorizontalLabels : Model -> List (Svg msg)
@@ -310,6 +295,9 @@ drawHorizontalLabels model =
         allTips =
             MatrixUtils.getHorizontalTips <| Matrix.map .value model.board
 
+        hoveredCell =
+            concreteGridCoord model.hoveredCell
+
         getTipsLine : Int -> List Int -> Svg msg
         getTipsLine index tips =
             let
@@ -322,7 +310,7 @@ drawHorizontalLabels model =
                 Svg.text_
                     [ y <| toString <| cellCoord.y + model.grid.cellSize / 2.0
                     , fill <|
-                        if isHoveredRow model index then
+                        if hoveredCell.row == index then
                             "white"
                         else
                             "black"
@@ -362,6 +350,9 @@ drawVerticalLabels model =
         allTips =
             MatrixUtils.getVerticalTips <| Matrix.map .value model.board
 
+        hoveredCell =
+            concreteGridCoord model.hoveredCell
+
         getTipsCol : Int -> List Int -> List (Svg msg)
         getTipsCol index tips =
             let
@@ -374,7 +365,7 @@ drawVerticalLabels model =
                             [ x <| toString <| cellCoord.x + model.grid.cellSize / 2.0
                             , y <| toString <| cellCoord.y - model.grid.cellSize * (toFloat rowIndex) - model.grid.boldThickness - 2.0
                             , fill <|
-                                if isHoveredCol model index then
+                                if index == hoveredCell.col then
                                     "white"
                                 else
                                     "black"

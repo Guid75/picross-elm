@@ -20,6 +20,7 @@ import Animation.Messenger
 import Ease
 import Grid exposing (Grid)
 import Types exposing (..)
+import Maybe.Extra
 import MatrixUtils
 import Msg exposing (Msg(..), LevelChooserMsg(..))
 import Model exposing (Model, State(..), AnimState(..), ShrinkAnims)
@@ -74,26 +75,9 @@ getLevels =
         Http.send GetLevels request
 
 
-drawHovered : Model -> List (Svg msg)
-drawHovered model =
-    case model.hoveredCell of
-        Nothing ->
-            []
-
-        Just { col, row } ->
-            let
-                cellCoord =
-                    Grid.getCellCoord col row model.grid
-            in
-                [ rect
-                    [ x <| toString <| cellCoord.x
-                    , y <| toString <| cellCoord.y
-                    , width <| toString <| model.grid.cellSize
-                    , height <| toString <| model.grid.cellSize
-                    , fill "blue"
-                    ]
-                    []
-                ]
+drawHovered : Grid -> GridCoord -> Svg Msg
+drawHovered grid gridCoord =
+    Grid.drawRect grid "blue" 0.0 gridCoord
 
 
 drawSelected : Model -> GridCoord -> Svg msg
@@ -404,7 +388,7 @@ drawSelection model =
         Just selection ->
             selection
                 |> selectionToCoordList
-                |> List.map (Grid.drawRect model.grid "violet")
+                |> List.map (Grid.drawRect model.grid "violet" 1.0)
 
 
 drawWinningLabel : Model -> List (Svg msg)
@@ -488,7 +472,8 @@ getSvgContent model =
                     , drawSelection model
                     , case ( isWinning model, model.selection ) of
                         ( False, Nothing ) ->
-                            drawHovered model
+                            Maybe.map (drawHovered model.grid) model.hoveredCell
+                                |> Maybe.Extra.toList
 
                         _ ->
                             []

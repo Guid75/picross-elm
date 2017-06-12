@@ -45,17 +45,17 @@ getThicknessByIndex grid index =
         grid.thinThickness
 
 
-drawRect : Grid -> String -> GridCoord -> Svg msg
-drawRect grid color { col, row } =
+drawRect : Grid -> String -> Float -> GridCoord -> Svg msg
+drawRect grid color padding { col, row } =
     let
         cellCoord =
             getCellCoord col row grid
     in
         rect
-            [ x <| toString <| cellCoord.x + 1.0
-            , y <| toString <| cellCoord.y + 1.0
-            , width <| toString <| grid.cellSize - 2.0
-            , height <| toString <| grid.cellSize - 2.0
+            [ x <| toString <| cellCoord.x + padding
+            , y <| toString <| cellCoord.y + padding
+            , width <| toString <| grid.cellSize - padding * 2.0
+            , height <| toString <| grid.cellSize - padding * 2.0
             , fill color
             ]
             []
